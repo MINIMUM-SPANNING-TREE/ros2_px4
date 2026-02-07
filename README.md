@@ -28,35 +28,46 @@ ros2 run uav_mavros2 uav_ctrl_node
 起飞默认高度2m，移动默认移动至坐标(4.0,4.0,4.0)
 ```
 ros2 run fsm test_takeoff
-
+```
+```
 ros2 run fsm move
-
+```
+```
 ros2 run fsm land
 
 ```
 接口函数介绍
 
+```
 arm(True) 
 ```
+
 解锁无人机，参数为bool，上层控制一般不用
+
 ```
 set_mode(None)      
 ```
+
 设置模式，模式类型如下
 自动起飞模式    AUTO.TAKEOFF
 自动降落模式    AUTO.LAND
 自动保持模式    AUTO.LOITER
 板外控制模式    OFFBOARD
+
 ```
 takeoff_auto(relative_altitude = x)  
 ```
+
 自动起飞到设定高度x
+
 ```
 move_offboard(x, y, z, yaw: float = None)
 ```
+
 板外控制飞行到指定坐标，坐标为浮点数，偏航角度默认可不填写
+
 ```
 land_auto(timeout: float=30)
 ```
+
 自动降落，参数为超时检测默认30秒
-```
