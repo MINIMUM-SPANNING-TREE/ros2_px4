@@ -15,6 +15,11 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/UavState.msg"
   "msg/UavPose.msg"
   "msg/UavHealth.msg"
+  "srv/Takeoff.srv"
+  "srv/Land.srv"
+  "srv/Move.srv"
+  "srv/Arm.srv"
+  "srv/SetMode.srv"
   DEPENDENCIES std_msgs
 )
 

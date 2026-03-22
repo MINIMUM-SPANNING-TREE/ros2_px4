@@ -24,10 +24,16 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'fsm_node = fsm.fsm:main',
-            'test_takeoff = fsm.test_takeoff:main',
-            'land =fsm.land:main',
-            'move =fsm.move:main',
+              'fsm_node = fsm.uav_fsm_node:main',
+              'test_takeoff = fsm.test_takeoff:main',
+              'test_takeoff_ctrl = fsm.test_takeoff_ctrl:main',
+              'land = fsm.land:main',
+              'move = fsm.move:main',
+              'test_move_ctrl = fsm.test_move_ctrl:main',
+              'test_hover_ctrl = fsm.test_hover_ctrl:main',
+              'test_land_ctrl = fsm.test_land_ctrl:main',
+              'test_full_mission = fsm.test_full_mission:main',
+            
         ],
     },
 )
