@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'mission_console = mission.mission_console_launcher:main',
         ],
     },
 )

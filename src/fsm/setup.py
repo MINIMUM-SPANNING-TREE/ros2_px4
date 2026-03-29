@@ -32,7 +32,9 @@ setup(
               'test_move_ctrl = fsm.test_move_ctrl:main',
               'test_hover_ctrl = fsm.test_hover_ctrl:main',
               'test_land_ctrl = fsm.test_land_ctrl:main',
+              'test_rtl_ctrl = fsm.test_rtl_ctrl:main',
               'test_full_mission = fsm.test_full_mission:main',
+             'launcher_takeoff = fsm.launcher_takeoff:main',
             
         ],
     },

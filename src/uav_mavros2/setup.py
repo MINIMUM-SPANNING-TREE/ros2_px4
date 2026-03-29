@@ -28,6 +28,7 @@ setup(
             'uav_ctrl_node = uav_mavros2.uav_ctrl:main',
             'print_node = uav_mavros2.print:main',
             'ctrl_server_node = uav_mavros2.ctrl_server:main',
+            'launch_server_node = uav_mavros2.launch_server:main',
         ],
     },
 )

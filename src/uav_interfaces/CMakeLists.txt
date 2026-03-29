@@ -20,6 +20,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/Move.srv"
   "srv/Arm.srv"
   "srv/SetMode.srv"
+  "srv/Rtl.srv"
   DEPENDENCIES std_msgs
 )
 
