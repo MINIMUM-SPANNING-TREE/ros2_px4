@@ -19,10 +19,29 @@ source install/setup.bash
 make px4_sitl gz_x500
 ```
 
-### 3) 启动 MAVROS 桥接
+### 3) 启动 MAVROS 桥接（按场景选择）
+
+仿真（SITL）：
 ```
 ros2 launch mavros px4.launch fcu_url:=udp://:14540@localhost:14557
 ```
+
+真机（USB 串口）：
+```
+# 启动前先确认设备名（如 /dev/ttyACM0 或 /dev/ttyACM1）
+ros2 launch mavros px4.launch fcu_url:=serial:///dev/ttyACM1:57600
+```
+
+真机（ESP8266 WiFi bridge）：
+```
+# 典型配置：Host Port=14550, Client Port=14555, Baudrate=57600
+ros2 launch mavros px4.launch fcu_url:=udp://:14550@192.168.4.1:14555
+```
+
+说明：
+- USB 模式下串口名可能变化，建议每次启动前确认（终端输入ls /dev/ttyACM*u查询）。
+- WiFi 模式下若出现 RTT / RADIO_STATUS 告警，但遥测正常，一般不影响基础联通。
+- 室内常见 No GPS fix，不代表 MAVROS 或飞控未连接。
 
 ### 4) 启动服务端（v2/v3 主控制链路）
 ```
