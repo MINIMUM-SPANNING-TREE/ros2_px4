@@ -9,19 +9,33 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(builtin_interfaces REQUIRED)
 
 # 声明消息文件
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/UavState.msg"
   "msg/UavPose.msg"
   "msg/UavHealth.msg"
+  "msg/LslidarInformation.msg"
+  "msg/LslidarPacket.msg"
   "srv/Takeoff.srv"
   "srv/Land.srv"
   "srv/Move.srv"
   "srv/Arm.srv"
   "srv/SetMode.srv"
   "srv/Rtl.srv"
-  DEPENDENCIES std_msgs
+  "srv/AngleDistortionCorrection.srv"
+  "srv/FrameRate.srv"
+  "srv/InvalidData.srv"
+  "srv/IpAndPort.srv"
+  "srv/MotorControl.srv"
+  "srv/MotorSpeed.srv"
+  "srv/PowerControl.srv"
+  "srv/RfdRemoval.srv"
+  "srv/StandbyMode.srv"
+  "srv/TailRemoval.srv"
+  "srv/TimeMode.srv"
+  DEPENDENCIES std_msgs builtin_interfaces
 )
 
 if(BUILD_TESTING)
