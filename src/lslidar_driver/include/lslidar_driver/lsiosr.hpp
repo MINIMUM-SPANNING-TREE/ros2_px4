@@ -29,7 +29,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include "lslidar_driver/lslidar_log.hpp"
-#include "lslidar_msgs/msg/lslidar_packet.hpp"
+#include "uav_interfaces/msg/lslidar_packet.hpp"
 
 namespace lslidar_driver {
 
@@ -80,7 +80,7 @@ public:
 
     ssize_t send(const char* buffer, size_t length = 188);
 
-    int getSerialData(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet, int packet_length, std::string lidar_model);
+    int getSerialData(uav_interfaces::msg::LslidarPacket::UniquePtr &packet, int packet_length, std::string lidar_model);
 
     bool waitEvent(short events, int timeout_ms);
 

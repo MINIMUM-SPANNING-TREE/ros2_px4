@@ -37,7 +37,7 @@
 #include "lslidar_driver/lslidar_pointcloud.hpp"
 #include "lslidar_driver/pointcloud_transform.hpp"
 #include "lslidar_driver/lslidar_services.hpp"
-#include "lslidar_msgs/msg/lslidar_information.hpp" 
+#include "uav_interfaces/msg/lslidar_information.hpp" 
 
 namespace lslidar_driver {
 
@@ -65,14 +65,14 @@ namespace lslidar_driver {
         
         rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_pub_;
         rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr laserscan_pub_;
-        rclcpp::Publisher<lslidar_msgs::msg::LslidarInformation>::SharedPtr lidar_info_pub_;
+        rclcpp::Publisher<uav_interfaces::msg::LslidarInformation>::SharedPtr lidar_info_pub_;
         rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr time_pub_;
         
-        rclcpp::Service<lslidar_msgs::srv::IpAndPort>::SharedPtr network_config_service_;
-        rclcpp::Service<lslidar_msgs::srv::MotorSpeed>::SharedPtr motor_speed_service_;
-        rclcpp::Service<lslidar_msgs::srv::TimeMode>::SharedPtr time_mode_service_;
+        rclcpp::Service<uav_interfaces::srv::IpAndPort>::SharedPtr network_config_service_;
+        rclcpp::Service<uav_interfaces::srv::MotorSpeed>::SharedPtr motor_speed_service_;
+        rclcpp::Service<uav_interfaces::srv::TimeMode>::SharedPtr time_mode_service_;
         
-        lslidar_msgs::msg::LslidarInformation::SharedPtr lidar_info_data_;
+        uav_interfaces::msg::LslidarInformation::SharedPtr lidar_info_data_;
         PointCloudTransform pointcloud_transform_;
 
         std::shared_ptr<Input> msop_input_;

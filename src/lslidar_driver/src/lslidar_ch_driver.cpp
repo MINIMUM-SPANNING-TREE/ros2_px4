@@ -163,24 +163,24 @@ namespace lslidar_driver {
     bool LslidarChDriver::createRosIO() {
         pointcloud_pub_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pointcloud_topic, 10); 
         if (publish_laserscan) laserscan_pub_ = node_->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
-        lidar_info_pub_ = node_->create_publisher<lslidar_msgs::msg::LslidarInformation>("lslidar_device_info", 1);
+        lidar_info_pub_ = node_->create_publisher<uav_interfaces::msg::LslidarInformation>("lslidar_device_info", 1);
         time_pub_ = node_->create_publisher<std_msgs::msg::Float64>("time_topic", 10);
 
-        network_config_service_ = node_->create_service<lslidar_msgs::srv::IpAndPort>("network_setup",
-            [this](std::shared_ptr<lslidar_msgs::srv::IpAndPort::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::IpAndPort::Response> res) {
+        network_config_service_ = node_->create_service<uav_interfaces::srv::IpAndPort>("network_setup",
+            [this](std::shared_ptr<uav_interfaces::srv::IpAndPort::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::IpAndPort::Response> res) {
                 std::dynamic_pointer_cast<LslidarChServices>(services_)->setIpAndPort(req, res);
             });
 
-        motor_speed_service_ = node_->create_service<lslidar_msgs::srv::MotorSpeed>("motor_speed",
-            [this](std::shared_ptr<lslidar_msgs::srv::MotorSpeed::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::MotorSpeed::Response> res) {
+        motor_speed_service_ = node_->create_service<uav_interfaces::srv::MotorSpeed>("motor_speed",
+            [this](std::shared_ptr<uav_interfaces::srv::MotorSpeed::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::MotorSpeed::Response> res) {
                 std::dynamic_pointer_cast<LslidarChServices>(services_)->setMotorSpeed(req, res);
             });
         
-        time_mode_service_ = node_->create_service<lslidar_msgs::srv::TimeMode>("time_mode",
-            [this](std::shared_ptr<lslidar_msgs::srv::TimeMode::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::TimeMode::Response> res) {
+        time_mode_service_ = node_->create_service<uav_interfaces::srv::TimeMode>("time_mode",
+            [this](std::shared_ptr<uav_interfaces::srv::TimeMode::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::TimeMode::Response> res) {
                 std::dynamic_pointer_cast<LslidarChServices>(services_)->setTimeMode(req, res);
             });
 
@@ -405,7 +405,7 @@ namespace lslidar_driver {
     }
 
     void LslidarChDriver::difopPoll(void) {
-        lslidar_msgs::msg::LslidarPacket::UniquePtr difop_packet(new lslidar_msgs::msg::LslidarPacket());   
+        uav_interfaces::msg::LslidarPacket::UniquePtr difop_packet(new uav_interfaces::msg::LslidarPacket());   
         // reading and publishing scans as fast as possible.
         while (rclcpp::ok()) {
             // keep reading
@@ -427,7 +427,7 @@ namespace lslidar_driver {
 
                     Information device = device_info_->getDeviceInfo(difop_packet);
 
-                    lidar_info_data_ = std::make_shared<lslidar_msgs::msg::LslidarInformation>();
+                    lidar_info_data_ = std::make_shared<uav_interfaces::msg::LslidarInformation>();
                     lidar_info_data_->lidar_ip = device.lidarIp;
                     lidar_info_data_->destination_ip = device.destinationIP;
                     lidar_info_data_->lidar_mac_address = device.lidarMacAddress;
@@ -648,7 +648,7 @@ namespace lslidar_driver {
     }
 
     bool LslidarChDriver::poll() {
-        lslidar_msgs::msg::LslidarPacket::UniquePtr packet_(new lslidar_msgs::msg::LslidarPacket());
+        uav_interfaces::msg::LslidarPacket::UniquePtr packet_(new uav_interfaces::msg::LslidarPacket());
 
         while (rclcpp::ok()) {
             // keep reading until full packet received
@@ -717,7 +717,7 @@ namespace lslidar_driver {
         return true;
     }
 
-    void LslidarChDriver::packetProcessSingle(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet) {
+    void LslidarChDriver::packetProcessSingle(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet) {
         Firing lidardata;
         packetType = false;
         point_interval_time = packet_interval_time * CH_SINGLE_ECHO;
@@ -782,7 +782,7 @@ namespace lslidar_driver {
         }
     }
 
-    void LslidarChDriver::packetProcessDouble(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet) {
+    void LslidarChDriver::packetProcessDouble(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet) {
         Firing lidardata;     
         packetType = false;
         point_interval_time = packet_interval_time * CH_DOUBLE_ECHO;
@@ -877,7 +877,7 @@ namespace lslidar_driver {
     }
 
     bool LslidarChDriver::getLidarEcho(void){
-        lslidar_msgs::msg::LslidarPacket::UniquePtr pkt(new lslidar_msgs::msg::LslidarPacket());
+        uav_interfaces::msg::LslidarPacket::UniquePtr pkt(new uav_interfaces::msg::LslidarPacket());
         while (rclcpp::ok()) {
             // keep reading until full packet received
             int rc_ = msop_input_->getPacket(pkt);

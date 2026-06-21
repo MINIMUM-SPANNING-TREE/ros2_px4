@@ -1,0 +1,38 @@
+# 大华相机配置文件
+
+# 相机基本参数
+camera:
+  camera_type: "dahua"  # 相机类型
+  camera_id: "0"        # 相机ID（序列号、IP或索引）
+  
+  # 图像参数
+  image_width: 1920
+  image_height: 1080
+  fps: 30.0
+  
+  # 曝光参数
+  exposure: 10000.0  # 曝光时间（微秒）
+  gain: 0.0          # 增益（dB）
+  
+  # 触发模式
+  trigger_mode: false
+  
+  # ROI区域（可选）
+  roi:
+    x: 0
+    y: 0
+    width: 0
+    height: 0
+
+# 发布参数
+publisher:
+  frame_id: "camera"
+  qos_depth: 10
+  auto_connect: true
+  auto_start: true
+
+# DeepSORT兼容性设置
+deepsort_compatible:
+  # 确保话题名称与DeepSORT节点匹配
+  image_topic: "~/image_raw"
+  encoding: "bgr8"

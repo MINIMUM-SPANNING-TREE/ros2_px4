@@ -433,7 +433,7 @@ namespace lslidar_driver {
             usleep(2000000);
             return true; 
         }
-        lslidar_msgs::msg::LslidarPacket::UniquePtr packet(new lslidar_msgs::msg::LslidarPacket());
+        uav_interfaces::msg::LslidarPacket::UniquePtr packet(new uav_interfaces::msg::LslidarPacket());
         int packet_size;
         while (rclcpp::ok()) {
             packet_size = data_acquisition_strategy_->getPacket(packet);
@@ -710,7 +710,7 @@ namespace lslidar_driver {
         return (diff_prev > dynamic_threshold) && (diff_next > dynamic_threshold);
     }
 
-    bool LslidarX10Driver::checkPacketValidityM10(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet, int packet_size) const {
+    bool LslidarX10Driver::checkPacketValidityM10(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet, int packet_size) const {
         if (packet->data[0] != 0xA5 || packet->data[1] != 0x5A) {
             return false;
         }
@@ -722,7 +722,7 @@ namespace lslidar_driver {
         return (packet->data[packet_size - 2] == 0xFA && packet->data[packet_size - 1] == 0xFB);
     }
 
-    bool LslidarX10Driver::checkPacketValidityN10(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet, int packet_size) const {
+    bool LslidarX10Driver::checkPacketValidityN10(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet, int packet_size) const {
         if (packet->data[0] != 0xA5 || packet->data[1] != 0x5A) {
             return false;
         }
@@ -747,7 +747,7 @@ namespace lslidar_driver {
         return true;
     }
 
-    bool LslidarX10Driver::checkPacketValidityN301(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet, int packet_size) const {
+    bool LslidarX10Driver::checkPacketValidityN301(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet, int packet_size) const {
         for (size_t blk_idx = 0; blk_idx < BLOCKS_PER_PACKET_N301; ++blk_idx) {
             if (packet->data[blk_idx * SIZE_BLOCK_N301] != 0xff || packet->data[blk_idx * SIZE_BLOCK_N301 + 1] != 0xee) {
                 return false;
@@ -757,7 +757,7 @@ namespace lslidar_driver {
         return true;
     }
 
-    void LslidarX10Driver::decodePacketM10(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet) {
+    void LslidarX10Driver::decodePacketM10(uav_interfaces::msg::LslidarPacket::UniquePtr &packet) {
         std::vector<FiringX10> raw_points;
         raw_points.reserve(packet_points_max);
 
@@ -787,7 +787,7 @@ namespace lslidar_driver {
         }
     }
 
-    void LslidarX10Driver::decodePacketN10(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet) {
+    void LslidarX10Driver::decodePacketN10(uav_interfaces::msg::LslidarPacket::UniquePtr &packet) {
         int start_angle = ((packet->data[angle_bits_start] << 8) + packet->data[angle_bits_start + 1]) % 36000;
         int end_angle = ((packet->data[end_angle_bits_start] << 8) + packet->data[end_angle_bits_start + 1]) % 36000;
 
@@ -815,7 +815,7 @@ namespace lslidar_driver {
         return;
     }
 
-    void LslidarX10Driver::decodePacketN10Plus(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet) {
+    void LslidarX10Driver::decodePacketN10Plus(uav_interfaces::msg::LslidarPacket::UniquePtr &packet) {
         int start_angle = ((packet->data[angle_bits_start] << 8) + packet->data[angle_bits_start + 1]) % 36000;
         int end_angle = ((packet->data[end_angle_bits_start] << 8) + packet->data[end_angle_bits_start + 1]) % 36000;
 
@@ -852,7 +852,7 @@ namespace lslidar_driver {
         return;
     }
 
-    void LslidarX10Driver::decodePacketN301_1_6(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet) {
+    void LslidarX10Driver::decodePacketN301_1_6(uav_interfaces::msg::LslidarPacket::UniquePtr &packet) {
         uint16_t firing_azimuth[BLOCKS_PER_PACKET_N301];
 
         for (size_t b_idx = 0; b_idx < BLOCKS_PER_PACKET_N301; ++b_idx) {
@@ -892,7 +892,7 @@ namespace lslidar_driver {
         }
     }
 
-    void LslidarX10Driver::decodePacketN301_1_7(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet) {
+    void LslidarX10Driver::decodePacketN301_1_7(uav_interfaces::msg::LslidarPacket::UniquePtr &packet) {
         uint16_t firing_azimuth[BLOCKS_PER_PACKET_N301];
 
         for (size_t b_idx = 0; b_idx < BLOCKS_PER_PACKET_N301; ++b_idx) {
@@ -933,7 +933,7 @@ namespace lslidar_driver {
         }
     }
 
-    bool LslidarX10Driver::judgmentProtocol(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet) {
+    bool LslidarX10Driver::judgmentProtocol(uav_interfaces::msg::LslidarPacket::UniquePtr &packet) {
         for (size_t idx = 0; idx < BLOCKS_PER_PACKET_N301; ++idx) {
             // 1.6协议 每个数据块前 7 个字节为FF EE 角度 第一个点
             for (size_t i = 7; i < SIZE_BLOCK_N301; ++i) {
@@ -949,7 +949,7 @@ namespace lslidar_driver {
 
     bool LslidarX10Driver::determineN301Model() {
         if (n301_protocol > 3.0) {    // launch不指定协议，启用自动判断
-            lslidar_msgs::msg::LslidarPacket::UniquePtr pkt(new lslidar_msgs::msg::LslidarPacket());
+            uav_interfaces::msg::LslidarPacket::UniquePtr pkt(new uav_interfaces::msg::LslidarPacket());
             int packet_size;
             while (rclcpp::ok()) {
                 packet_size = msop_input_->getPacket(pkt);

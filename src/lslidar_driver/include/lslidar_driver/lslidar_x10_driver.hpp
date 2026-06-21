@@ -88,25 +88,25 @@ namespace lslidar_driver {
 
         void publishMultiEchoLaserScan();
 
-        std::function<bool(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet, int packet_size)> checkPacketValidity;
+        std::function<bool(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet, int packet_size)> checkPacketValidity;
 
-        bool checkPacketValidityM10(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet, int packet_size) const;
+        bool checkPacketValidityM10(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet, int packet_size) const;
 
-        bool checkPacketValidityN10(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet, int packet_size) const;
+        bool checkPacketValidityN10(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet, int packet_size) const;
 
-        bool checkPacketValidityN301(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet, int packet_size) const;
+        bool checkPacketValidityN301(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet, int packet_size) const;
 
-        std::function<void(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet)> decodePacket;
+        std::function<void(uav_interfaces::msg::LslidarPacket::UniquePtr &packet)> decodePacket;
 
-        void decodePacketM10(lslidar_msgs::msg::LslidarPacket::UniquePtr &packetlidardata);
+        void decodePacketM10(uav_interfaces::msg::LslidarPacket::UniquePtr &packetlidardata);
 
-        void decodePacketN10(lslidar_msgs::msg::LslidarPacket::UniquePtr &packetlidardata);
+        void decodePacketN10(uav_interfaces::msg::LslidarPacket::UniquePtr &packetlidardata);
 
-        void decodePacketN10Plus(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet);
+        void decodePacketN10Plus(uav_interfaces::msg::LslidarPacket::UniquePtr &packet);
 
-        void decodePacketN301_1_6(lslidar_msgs::msg::LslidarPacket::UniquePtr &packetlidardata);
+        void decodePacketN301_1_6(uav_interfaces::msg::LslidarPacket::UniquePtr &packetlidardata);
 
-        void decodePacketN301_1_7(lslidar_msgs::msg::LslidarPacket::UniquePtr &packetlidardata);
+        void decodePacketN301_1_7(uav_interfaces::msg::LslidarPacket::UniquePtr &packetlidardata);
 
         bool isPointValid(const int fir_idx) const;
 
@@ -116,7 +116,7 @@ namespace lslidar_driver {
 
         void pointcloudToLaserscan(const sensor_msgs::msg::PointCloud2 &cloud_msg, sensor_msgs::msg::LaserScan &output_scan);
 
-        bool judgmentProtocol(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet);
+        bool judgmentProtocol(uav_interfaces::msg::LslidarPacket::UniquePtr &packet);
 
         bool determineN301Model();
 

@@ -83,7 +83,7 @@ namespace lslidar_driver {
 
         std::function<void(Firing&)> currentConverter;  // 当前雷达的处理函数
 
-        std::function<void(const lslidar_msgs::msg::LslidarPacket::UniquePtr&)> packetProcess;
+        std::function<void(const uav_interfaces::msg::LslidarPacket::UniquePtr&)> packetProcess;
 
     public:
         LslidarChDriver(rclcpp::Node::SharedPtr node);
@@ -134,11 +134,11 @@ namespace lslidar_driver {
 
         void convertCoordinate_ch256(struct Firing &lidardata);
 
-        void packetProcessSingle(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet);
+        void packetProcessSingle(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet);
 
-        void packetProcessDouble(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet);
+        void packetProcessDouble(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet);
 
-        void lidarEchoMode(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet);
+        void lidarEchoMode(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet);
 
         void updateLaserscan(float x, float y, float intensity);
 

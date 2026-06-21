@@ -110,7 +110,7 @@ namespace lslidar_driver {
     }
 
 /** @brief Get one lslidar packet. */
-    int InputSocket::getPacket(lslidar_msgs::msg::LslidarPacket::UniquePtr &pkt) {
+    int InputSocket::getPacket(uav_interfaces::msg::LslidarPacket::UniquePtr &pkt) {
         struct pollfd fds[1];
         fds[0].fd = sockfd_;
         fds[0].events = POLLIN; 
@@ -229,7 +229,7 @@ namespace lslidar_driver {
     }
 
 /** @brief Get one lslidar packet. */
-    int InputPCAP::getPacket(lslidar_msgs::msg::LslidarPacket::UniquePtr &pkt) {
+    int InputPCAP::getPacket(uav_interfaces::msg::LslidarPacket::UniquePtr &pkt) {
         struct pcap_pkthdr *header;
         const u_char *pkt_data;
         

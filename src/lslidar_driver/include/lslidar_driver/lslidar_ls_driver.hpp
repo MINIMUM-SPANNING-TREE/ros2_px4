@@ -94,21 +94,21 @@ namespace lslidar_driver {
 
         void publishPointCloudNew();
 
-        std::function<void(const lslidar_msgs::msg::LslidarPacket::UniquePtr&)> lslidarPacketProcess;
+        std::function<void(const uav_interfaces::msg::LslidarPacket::UniquePtr&)> lslidarPacketProcess;
 
-        void packetProcessSingle(const lslidar_msgs::msg::LslidarPacket::UniquePtr& packet);
+        void packetProcessSingle(const uav_interfaces::msg::LslidarPacket::UniquePtr& packet);
         
-        void packetProcessDouble(const lslidar_msgs::msg::LslidarPacket::UniquePtr& packet);
+        void packetProcessDouble(const uav_interfaces::msg::LslidarPacket::UniquePtr& packet);
 
         void prepareAndPublishPointCloud(bool& packetType);
         
-        void checkPacketLoss(const lslidar_msgs::msg::LslidarPacket::UniquePtr &msg, int data_offset, int byte_count);
+        void checkPacketLoss(const uav_interfaces::msg::LslidarPacket::UniquePtr &msg, int data_offset, int byte_count);
 
         void updateTimeOffsets(double point_interval_time, int point_size);
 
         bool getLidarInformation();
 
-        Information getDeviceInfo(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet);
+        Information getDeviceInfo(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet);
 
         typedef std::shared_ptr<LslidarLsDriver> LslidarLsDriverPtr;
         typedef std::shared_ptr<const LslidarLsDriver> LslidarLsDriverConstPtr;
@@ -119,10 +119,10 @@ namespace lslidar_driver {
         rclcpp::Publisher<std_msgs::msg::Int64>::SharedPtr packet_loss_pub_;
         rclcpp::Publisher<std_msgs::msg::String>::SharedPtr fault_code_pub_;
 
-        rclcpp::Service<lslidar_msgs::srv::AngleDistortionCorrection>::SharedPtr angle_distortion_correction_service_;
-        rclcpp::Service<lslidar_msgs::srv::FrameRate>::SharedPtr frame_rate_service_;
-        rclcpp::Service<lslidar_msgs::srv::InvalidData>::SharedPtr invalid_data_service_;
-        rclcpp::Service<lslidar_msgs::srv::StandbyMode>::SharedPtr standby_mode_service_;
+        rclcpp::Service<uav_interfaces::srv::AngleDistortionCorrection>::SharedPtr angle_distortion_correction_service_;
+        rclcpp::Service<uav_interfaces::srv::FrameRate>::SharedPtr frame_rate_service_;
+        rclcpp::Service<uav_interfaces::srv::InvalidData>::SharedPtr invalid_data_service_;
+        rclcpp::Service<uav_interfaces::srv::StandbyMode>::SharedPtr standby_mode_service_;
 
         uint64_t pointcloudTimeStamp{};
         unsigned char packetTimeStamp[10]{};

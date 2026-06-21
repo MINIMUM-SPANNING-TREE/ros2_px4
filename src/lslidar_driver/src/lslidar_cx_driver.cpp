@@ -172,48 +172,48 @@ namespace lslidar_driver {
     bool LslidarCxDriver::createRosIO() {
         pointcloud_pub_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pointcloud_topic, 10); 
         if (publish_scan) laserscan_pub_ = node_->create_publisher<sensor_msgs::msg::LaserScan>("scan_raw", 10);
-        lidar_info_pub_ = node_->create_publisher<lslidar_msgs::msg::LslidarInformation>("lslidar_device_info", 1);
+        lidar_info_pub_ = node_->create_publisher<uav_interfaces::msg::LslidarInformation>("lslidar_device_info", 1);
         time_pub_ = node_->create_publisher<std_msgs::msg::Float64>("time_topic", 10);
 
-        network_config_service_ = node_->create_service<lslidar_msgs::srv::IpAndPort>("network_setup",
-            [this](std::shared_ptr<lslidar_msgs::srv::IpAndPort::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::IpAndPort::Response> res) {
+        network_config_service_ = node_->create_service<uav_interfaces::srv::IpAndPort>("network_setup",
+            [this](std::shared_ptr<uav_interfaces::srv::IpAndPort::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::IpAndPort::Response> res) {
                 std::dynamic_pointer_cast<LslidarCxServices>(services_)->setIpAndPort(req, res);
             });
 
-        motor_speed_service_ = node_->create_service<lslidar_msgs::srv::MotorSpeed>("motor_speed",
-            [this](std::shared_ptr<lslidar_msgs::srv::MotorSpeed::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::MotorSpeed::Response> res) {
+        motor_speed_service_ = node_->create_service<uav_interfaces::srv::MotorSpeed>("motor_speed",
+            [this](std::shared_ptr<uav_interfaces::srv::MotorSpeed::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::MotorSpeed::Response> res) {
                 std::dynamic_pointer_cast<LslidarCxServices>(services_)->setMotorSpeed(req, res);
             });
 
-        motor_control_service_ = node_->create_service<lslidar_msgs::srv::MotorControl>("motor_control",
-            [this](std::shared_ptr<lslidar_msgs::srv::MotorControl::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::MotorControl::Response> res) {
+        motor_control_service_ = node_->create_service<uav_interfaces::srv::MotorControl>("motor_control",
+            [this](std::shared_ptr<uav_interfaces::srv::MotorControl::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::MotorControl::Response> res) {
                 std::dynamic_pointer_cast<LslidarCxServices>(services_)->setMotorControl(req, res);
             });
 
-        power_control_service_ = node_->create_service<lslidar_msgs::srv::PowerControl>("power_control",
-            [this](std::shared_ptr<lslidar_msgs::srv::PowerControl::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::PowerControl::Response> res) {
+        power_control_service_ = node_->create_service<uav_interfaces::srv::PowerControl>("power_control",
+            [this](std::shared_ptr<uav_interfaces::srv::PowerControl::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::PowerControl::Response> res) {
                 std::dynamic_pointer_cast<LslidarCxServices>(services_)->setPowerControl(req, res);
             });
 
-        rfd_removal_service_ = node_->create_service<lslidar_msgs::srv::RfdRemoval>("remove_rain_fog_dust",
-            [this](std::shared_ptr<lslidar_msgs::srv::RfdRemoval::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::RfdRemoval::Response> res) {
+        rfd_removal_service_ = node_->create_service<uav_interfaces::srv::RfdRemoval>("remove_rain_fog_dust",
+            [this](std::shared_ptr<uav_interfaces::srv::RfdRemoval::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::RfdRemoval::Response> res) {
                 std::dynamic_pointer_cast<LslidarCxServices>(services_)->setRfdRemoval(req, res);
             });
 
-        tail_removal_service_ = node_->create_service<lslidar_msgs::srv::TailRemoval>("tail_remove",
-            [this](std::shared_ptr<lslidar_msgs::srv::TailRemoval::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::TailRemoval::Response> res) {
+        tail_removal_service_ = node_->create_service<uav_interfaces::srv::TailRemoval>("tail_remove",
+            [this](std::shared_ptr<uav_interfaces::srv::TailRemoval::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::TailRemoval::Response> res) {
                 std::dynamic_pointer_cast<LslidarCxServices>(services_)->setTailRemoval(req, res);
             });
 
-        time_mode_service_ = node_->create_service<lslidar_msgs::srv::TimeMode>("time_mode",
-            [this](std::shared_ptr<lslidar_msgs::srv::TimeMode::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::TimeMode::Response> res) {
+        time_mode_service_ = node_->create_service<uav_interfaces::srv::TimeMode>("time_mode",
+            [this](std::shared_ptr<uav_interfaces::srv::TimeMode::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::TimeMode::Response> res) {
                 std::dynamic_pointer_cast<LslidarCxServices>(services_)->setTimeMode(req, res);
             });
 
@@ -421,7 +421,7 @@ namespace lslidar_driver {
         laserscan_pub_->publish(std::move(scan_msg_bak));
     }
 
-    bool LslidarCxDriver::checkPacketValidity(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet) {
+    bool LslidarCxDriver::checkPacketValidity(uav_interfaces::msg::LslidarPacket::UniquePtr &packet) {
         for (size_t blk_idx = 0; blk_idx < BLOCKS_PER_PACKET; ++blk_idx) {
             if (packet->data[blk_idx * 100] != 0xff && packet->data[blk_idx * 100 + 1] != 0xee) {
                 return false;
@@ -430,7 +430,7 @@ namespace lslidar_driver {
         return true;
     }
 
-    void LslidarCxDriver::decodePacket(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet) {
+    void LslidarCxDriver::decodePacket(uav_interfaces::msg::LslidarPacket::UniquePtr &packet) {
         //couputer azimuth angle for each firing
         for (size_t b_idx = 0; b_idx < BLOCKS_PER_PACKET; ++b_idx) {
             firings.firing_azimuth[b_idx] = (packet->data[b_idx * 100 + 2] + (packet->data[b_idx * 100 + 3] << 8)) % 36000; //* 0.01 * DEG_TO_RAD;
@@ -539,7 +539,7 @@ namespace lslidar_driver {
     }
 
     bool LslidarCxDriver::poll() {
-        lslidar_msgs::msg::LslidarPacket::UniquePtr packet(new lslidar_msgs::msg::LslidarPacket());
+        uav_interfaces::msg::LslidarPacket::UniquePtr packet(new uav_interfaces::msg::LslidarPacket());
 
         while (rclcpp::ok()) {
             // keep reading until full packet received
@@ -900,7 +900,7 @@ namespace lslidar_driver {
     }
 
     void LslidarCxDriver::difopPoll() {
-        lslidar_msgs::msg::LslidarPacket::UniquePtr difop_packet(new lslidar_msgs::msg::LslidarPacket());
+        uav_interfaces::msg::LslidarPacket::UniquePtr difop_packet(new uav_interfaces::msg::LslidarPacket());
         static bool is_print_working_time = true;
         WorkingTime cxMapping;
 
@@ -1019,7 +1019,7 @@ namespace lslidar_driver {
                 if (fpga_type != 0) {
                     Information device = device_info_->getCxDeviceInfo(difop_packet, fpga_type);
 
-                    lidar_info_data_ = std::make_shared<lslidar_msgs::msg::LslidarInformation>();
+                    lidar_info_data_ = std::make_shared<uav_interfaces::msg::LslidarInformation>();
                     lidar_info_data_->lidar_ip = device.lidarIp;
                     lidar_info_data_->destination_ip = device.destinationIP;
                     lidar_info_data_->lidar_mac_address = device.lidarMacAddress;
@@ -1040,7 +1040,7 @@ namespace lslidar_driver {
 
     bool LslidarCxDriver::determineLidarModel(){
         if (!is_get_difop_.load()) return false;
-        lslidar_msgs::msg::LslidarPacket::UniquePtr pkt(new lslidar_msgs::msg::LslidarPacket());
+        uav_interfaces::msg::LslidarPacket::UniquePtr pkt(new uav_interfaces::msg::LslidarPacket());
         
         while (rclcpp::ok()) {
             int rc_ = msop_input_->getPacket(pkt);

@@ -92,7 +92,7 @@ namespace lslidar_driver {
         return oss.str();
     }
 
-    Information LidarDeviceInfo::getCxDeviceInfo(const lslidar_msgs::msg::LslidarPacket::UniquePtr& packet, int fpga_type) {
+    Information LidarDeviceInfo::getCxDeviceInfo(const uav_interfaces::msg::LslidarPacket::UniquePtr& packet, int fpga_type) {
         Information device{};
         std::string lidarType2, lidarType3, firmwareDate2, firmwareDate3, version2, version3;
         // 提取IP地址
@@ -185,7 +185,7 @@ namespace lslidar_driver {
         return device;
     }
 
-    Information LidarDeviceInfo::getDeviceInfo(const lslidar_msgs::msg::LslidarPacket::UniquePtr& packet) {
+    Information LidarDeviceInfo::getDeviceInfo(const uav_interfaces::msg::LslidarPacket::UniquePtr& packet) {
         Information device{};
         std::string firmwareDate2, version2;
         // 提取IP地址

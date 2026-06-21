@@ -169,43 +169,43 @@ namespace lslidar_driver {
     bool LslidarLsDriver::createRosIO() {
         pointcloud_pub_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>(pointcloud_topic, 10); 
         fault_code_pub_ = node_->create_publisher<std_msgs::msg::String>("lslidar_fault_code", 1);
-        lidar_info_pub_ = node_->create_publisher<lslidar_msgs::msg::LslidarInformation>("lslidar_device_info", 1);
+        lidar_info_pub_ = node_->create_publisher<uav_interfaces::msg::LslidarInformation>("lslidar_device_info", 1);
         if (packet_loss) packet_loss_pub_ = node_->create_publisher<std_msgs::msg::Int64>("packet_loss", 10);
         time_pub_ = node_->create_publisher<std_msgs::msg::Float64>("time_topic", 10);
 
-        angle_distortion_correction_service_ = node_->create_service<lslidar_msgs::srv::AngleDistortionCorrection>("angle_distortion_correction",
-            [this](std::shared_ptr<lslidar_msgs::srv::AngleDistortionCorrection::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::AngleDistortionCorrection::Response> res) {
+        angle_distortion_correction_service_ = node_->create_service<uav_interfaces::srv::AngleDistortionCorrection>("angle_distortion_correction",
+            [this](std::shared_ptr<uav_interfaces::srv::AngleDistortionCorrection::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::AngleDistortionCorrection::Response> res) {
                 std::dynamic_pointer_cast<LslidarLsServices>(services_)->setAngleDistortionCorrection(req, res);
             });
 
-        network_config_service_ = node_->create_service<lslidar_msgs::srv::IpAndPort>("network_setup",
-            [this](std::shared_ptr<lslidar_msgs::srv::IpAndPort::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::IpAndPort::Response> res) {
+        network_config_service_ = node_->create_service<uav_interfaces::srv::IpAndPort>("network_setup",
+            [this](std::shared_ptr<uav_interfaces::srv::IpAndPort::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::IpAndPort::Response> res) {
                 std::dynamic_pointer_cast<LslidarLsServices>(services_)->setIpAndPort(req, res);
             });
 
-        time_mode_service_ = node_->create_service<lslidar_msgs::srv::TimeMode>("time_mode",
-            [this](std::shared_ptr<lslidar_msgs::srv::TimeMode::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::TimeMode::Response> res) {
+        time_mode_service_ = node_->create_service<uav_interfaces::srv::TimeMode>("time_mode",
+            [this](std::shared_ptr<uav_interfaces::srv::TimeMode::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::TimeMode::Response> res) {
                 std::dynamic_pointer_cast<LslidarLsServices>(services_)->setTimeMode(req, res);
             });
 
-        frame_rate_service_ = node_->create_service<lslidar_msgs::srv::FrameRate>("frame_rate",
-            [this](std::shared_ptr<lslidar_msgs::srv::FrameRate::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::FrameRate::Response> res) {
+        frame_rate_service_ = node_->create_service<uav_interfaces::srv::FrameRate>("frame_rate",
+            [this](std::shared_ptr<uav_interfaces::srv::FrameRate::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::FrameRate::Response> res) {
                 std::dynamic_pointer_cast<LslidarLsServices>(services_)->setFrameRate(req, res);
             });
 
-        invalid_data_service_ = node_->create_service<lslidar_msgs::srv::InvalidData>("invalid_data",
-            [this](std::shared_ptr<lslidar_msgs::srv::InvalidData::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::InvalidData::Response> res) {
+        invalid_data_service_ = node_->create_service<uav_interfaces::srv::InvalidData>("invalid_data",
+            [this](std::shared_ptr<uav_interfaces::srv::InvalidData::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::InvalidData::Response> res) {
                 std::dynamic_pointer_cast<LslidarLsServices>(services_)->setInvalidData(req, res);
             });
 
-        standby_mode_service_ = node_->create_service<lslidar_msgs::srv::StandbyMode>("standby_mode",
-            [this](std::shared_ptr<lslidar_msgs::srv::StandbyMode::Request> req,
-                   std::shared_ptr<lslidar_msgs::srv::StandbyMode::Response> res) {
+        standby_mode_service_ = node_->create_service<uav_interfaces::srv::StandbyMode>("standby_mode",
+            [this](std::shared_ptr<uav_interfaces::srv::StandbyMode::Request> req,
+                   std::shared_ptr<uav_interfaces::srv::StandbyMode::Response> res) {
                 std::dynamic_pointer_cast<LslidarLsServices>(services_)->setStandbyMode(req, res);
             });
         
@@ -300,7 +300,7 @@ namespace lslidar_driver {
     }
 
     void LslidarLsDriver::difopPoll() {
-        lslidar_msgs::msg::LslidarPacket::UniquePtr difop_packet(new lslidar_msgs::msg::LslidarPacket());
+        uav_interfaces::msg::LslidarPacket::UniquePtr difop_packet(new uav_interfaces::msg::LslidarPacket());
         static bool stack_frames = true;
 
         while (rclcpp::ok()) {
@@ -353,7 +353,7 @@ namespace lslidar_driver {
 
                         Information device = device_info_->getDeviceInfo(difop_packet);
 
-                        lidar_info_data_ = std::make_shared<lslidar_msgs::msg::LslidarInformation>();
+                        lidar_info_data_ = std::make_shared<uav_interfaces::msg::LslidarInformation>();
                         lidar_info_data_->lidar_ip = device.lidarIp;
                         lidar_info_data_->destination_ip = device.destinationIP;
                         lidar_info_data_->lidar_mac_address = device.lidarMacAddress;
@@ -476,7 +476,7 @@ namespace lslidar_driver {
     }
 
     bool LslidarLsDriver::poll() {
-        lslidar_msgs::msg::LslidarPacket::UniquePtr packet(new lslidar_msgs::msg::LslidarPacket());
+        uav_interfaces::msg::LslidarPacket::UniquePtr packet(new uav_interfaces::msg::LslidarPacket());
 
         while (rclcpp::ok()) {
             // keep reading until full packet received
@@ -526,7 +526,7 @@ namespace lslidar_driver {
         return true;
     }
 
-    void LslidarLsDriver::packetProcessSingle(const lslidar_msgs::msg::LslidarPacket::UniquePtr& packet) {
+    void LslidarLsDriver::packetProcessSingle(const uav_interfaces::msg::LslidarPacket::UniquePtr& packet) {
         FiringLS lidardata;
         bool packetType = false;
         if (packet_loss) checkPacketLoss(packet, 1192, 2);
@@ -590,7 +590,7 @@ namespace lslidar_driver {
         last_packet_time = current_packet_time;
     }
 
-    void LslidarLsDriver::packetProcessDouble(const lslidar_msgs::msg::LslidarPacket::UniquePtr& packet) {
+    void LslidarLsDriver::packetProcessDouble(const uav_interfaces::msg::LslidarPacket::UniquePtr& packet) {
         FiringLS lidardata;
         bool packetType = false;
         if (packet_loss) checkPacketLoss(packet, 1188, 6);
@@ -686,7 +686,7 @@ namespace lslidar_driver {
         }
     }
 
-    void LslidarLsDriver::checkPacketLoss(const lslidar_msgs::msg::LslidarPacket::UniquePtr &msg, int data_offset, int byte_count) {
+    void LslidarLsDriver::checkPacketLoss(const uav_interfaces::msg::LslidarPacket::UniquePtr &msg, int data_offset, int byte_count) {
         int64_t current_packet_number_ = 0;
 
         for (int i = 0; i < byte_count; ++i) {
@@ -710,7 +710,7 @@ namespace lslidar_driver {
     }
 
     bool LslidarLsDriver::getLidarInformation(){
-        lslidar_msgs::msg::LslidarPacket::UniquePtr msg(new lslidar_msgs::msg::LslidarPacket());
+        uav_interfaces::msg::LslidarPacket::UniquePtr msg(new uav_interfaces::msg::LslidarPacket());
     
         while (rclcpp::ok()) {
             // keep reading until full packet received

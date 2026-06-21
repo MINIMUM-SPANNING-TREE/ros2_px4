@@ -181,9 +181,9 @@ namespace lslidar_driver {
 
         bool initAngleConfig();
 
-        bool checkPacketValidity(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet); 
+        bool checkPacketValidity(uav_interfaces::msg::LslidarPacket::UniquePtr &packet); 
 
-        void decodePacket(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet);
+        void decodePacket(uav_interfaces::msg::LslidarPacket::UniquePtr &packet);
 
         int calculateRing(size_t fir_idx) const;
 
@@ -220,10 +220,10 @@ namespace lslidar_driver {
 
         std::mutex pointcloud_lock;
 
-        rclcpp::Service<lslidar_msgs::srv::MotorControl>::SharedPtr motor_control_service_;
-        rclcpp::Service<lslidar_msgs::srv::PowerControl>::SharedPtr power_control_service_;
-        rclcpp::Service<lslidar_msgs::srv::RfdRemoval>::SharedPtr rfd_removal_service_;
-        rclcpp::Service<lslidar_msgs::srv::TailRemoval>::SharedPtr tail_removal_service_;
+        rclcpp::Service<uav_interfaces::srv::MotorControl>::SharedPtr motor_control_service_;
+        rclcpp::Service<uav_interfaces::srv::PowerControl>::SharedPtr power_control_service_;
+        rclcpp::Service<uav_interfaces::srv::RfdRemoval>::SharedPtr rfd_removal_service_;
+        rclcpp::Service<uav_interfaces::srv::TailRemoval>::SharedPtr tail_removal_service_;
 
         unsigned char packetTimeStamp[10];
         struct tm cur_time{};

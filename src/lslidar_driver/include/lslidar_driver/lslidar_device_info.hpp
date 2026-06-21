@@ -29,8 +29,8 @@
 #include <iostream> 
 #include "lslidar_log.hpp"  
 #include <rclcpp/rclcpp.hpp> 
-#include "lslidar_msgs/msg/lslidar_packet.hpp" 
-#include "lslidar_msgs/msg/lslidar_information.hpp" 
+#include "uav_interfaces/msg/lslidar_packet.hpp" 
+#include "uav_interfaces/msg/lslidar_information.hpp" 
 
 namespace lslidar_driver {
 
@@ -70,10 +70,10 @@ namespace lslidar_driver {
         std::string getCxLidarType(uint8_t data);
 
         // 获取 机械式 雷达设备信息
-        Information getCxDeviceInfo(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet, int fpga_type);
+        Information getCxDeviceInfo(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet, int fpga_type);
         
         // 获取 905 1550 雷达设备信息
-        Information getDeviceInfo(const lslidar_msgs::msg::LslidarPacket::UniquePtr &packet);
+        Information getDeviceInfo(const uav_interfaces::msg::LslidarPacket::UniquePtr &packet);
 
         std::string hex_to_string(unsigned int hexValue);
 

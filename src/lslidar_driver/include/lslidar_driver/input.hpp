@@ -37,7 +37,7 @@
 #include <math.h>
 
 #include "lslidar_driver/lslidar_log.hpp"
-#include "lslidar_msgs/msg/lslidar_packet.hpp"
+#include "uav_interfaces/msg/lslidar_packet.hpp"
 
 
 namespace lslidar_driver {
@@ -60,7 +60,7 @@ namespace lslidar_driver {
         virtual ~Input() {
         }
 
-        virtual int getPacket(lslidar_msgs::msg::LslidarPacket::UniquePtr &pkt) = 0;
+        virtual int getPacket(uav_interfaces::msg::LslidarPacket::UniquePtr &pkt) = 0;
 
         virtual ssize_t sendPacket(const unsigned char *data, size_t length) = 0;
         
@@ -84,7 +84,7 @@ namespace lslidar_driver {
 
         virtual ~InputSocket();
 
-        virtual int getPacket(lslidar_msgs::msg::LslidarPacket::UniquePtr &pkt);
+        virtual int getPacket(uav_interfaces::msg::LslidarPacket::UniquePtr &pkt);
 
         virtual ssize_t sendPacket(const unsigned char *data, size_t length);
 
@@ -104,7 +104,7 @@ namespace lslidar_driver {
 
         virtual ~InputPCAP();
 
-        virtual int getPacket(lslidar_msgs::msg::LslidarPacket::UniquePtr &pkt);
+        virtual int getPacket(uav_interfaces::msg::LslidarPacket::UniquePtr &pkt);
 
         virtual ssize_t sendPacket(const unsigned char *data, size_t length);
 

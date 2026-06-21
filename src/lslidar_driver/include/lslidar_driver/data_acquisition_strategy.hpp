@@ -22,14 +22,14 @@
 #include <memory>
 #include "lslidar_driver/input.hpp"
 #include "lslidar_driver/lsiosr.hpp"
-#include "lslidar_msgs/msg/lslidar_packet.hpp"
+#include "uav_interfaces/msg/lslidar_packet.hpp"
 
 namespace lslidar_driver {
 
     class DataAcquisitionStrategy {
     public:
         virtual ~DataAcquisitionStrategy() = default;
-        virtual int getPacket(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet) = 0;
+        virtual int getPacket(uav_interfaces::msg::LslidarPacket::UniquePtr &packet) = 0;
     };
 
     class NetworkStrategy : public DataAcquisitionStrategy {
@@ -37,7 +37,7 @@ namespace lslidar_driver {
         explicit NetworkStrategy(std::shared_ptr<lslidar_driver::Input> input)
             : msop_input_(std::move(input)) {}
 
-        int getPacket(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet) override {
+        int getPacket(uav_interfaces::msg::LslidarPacket::UniquePtr &packet) override {
             return msop_input_->getPacket(packet);
         }
     
@@ -50,7 +50,7 @@ namespace lslidar_driver {
         SerialStrategy(std::shared_ptr<lslidar_driver::LSIOSR> serial_input, int packet_length, const std::string& lidar_model)
             : serial_input_(std::move(serial_input)), packet_length_(packet_length), lidar_model_(lidar_model) {}
 
-        int getPacket(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet) override {
+        int getPacket(uav_interfaces::msg::LslidarPacket::UniquePtr &packet) override {
             return serial_input_->getSerialData(packet, packet_length_, lidar_model_);
         }
         

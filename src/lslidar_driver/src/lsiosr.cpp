@@ -198,7 +198,7 @@ namespace lslidar_driver {
     }
     
     //  获取单线雷达串口数据
-    int LSIOSR::getSerialData(lslidar_msgs::msg::LslidarPacket::UniquePtr &packet, int packet_length, std::string lidar_model) 
+    int LSIOSR::getSerialData(uav_interfaces::msg::LslidarPacket::UniquePtr &packet, int packet_length, std::string lidar_model) 
 	{
 		int count = 0;
 		int count_2 = 0;

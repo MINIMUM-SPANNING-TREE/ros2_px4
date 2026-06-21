@@ -20,7 +20,7 @@
 
 namespace lslidar_driver {
     // 获取设备包
-    int LslidarServices::getDifopPacket(lslidar_msgs::msg::LslidarPacket::UniquePtr &pkt) {
+    int LslidarServices::getDifopPacket(uav_interfaces::msg::LslidarPacket::UniquePtr &pkt) {
         if (pkt->data[0] == 0xA5 && pkt->data[1] == 0xFF && pkt->data[2] == 0x00 && pkt->data[3] == 0x5A) {
             
             {
@@ -155,8 +155,8 @@ namespace lslidar_driver {
         }
     }
 
-    bool LslidarServices::setIpAndPort(std::shared_ptr<lslidar_msgs::srv::IpAndPort::Request> req,
-                                       std::shared_ptr<lslidar_msgs::srv::IpAndPort::Response> res) {
+    bool LslidarServices::setIpAndPort(std::shared_ptr<uav_interfaces::srv::IpAndPort::Request> req,
+                                       std::shared_ptr<uav_interfaces::srv::IpAndPort::Response> res) {
         unsigned char ucwp_data[1206];
         if (!setUcwpData(ucwp_data)) {
             res->result = false;
@@ -211,8 +211,8 @@ namespace lslidar_driver {
         return true;
     }
 
-    bool LslidarServices::setMotorSpeed(std::shared_ptr<lslidar_msgs::srv::MotorSpeed::Request> req,
-                                        std::shared_ptr<lslidar_msgs::srv::MotorSpeed::Response> res) {
+    bool LslidarServices::setMotorSpeed(std::shared_ptr<uav_interfaces::srv::MotorSpeed::Request> req,
+                                        std::shared_ptr<uav_interfaces::srv::MotorSpeed::Response> res) {
         unsigned char ucwp_data[1206];
         if (!setUcwpData(ucwp_data)) {
             res->result = false;
@@ -265,8 +265,8 @@ namespace lslidar_driver {
         }
     }
 
-    bool LslidarServices::setTimeMode(std::shared_ptr<lslidar_msgs::srv::TimeMode::Request> req,
-                                      std::shared_ptr<lslidar_msgs::srv::TimeMode::Response> res) {
+    bool LslidarServices::setTimeMode(std::shared_ptr<uav_interfaces::srv::TimeMode::Request> req,
+                                      std::shared_ptr<uav_interfaces::srv::TimeMode::Response> res) {
         if (req->time_mode > 5) {
             LS_ERROR << "Parameter error, please check the input parameters." << LS_END;
             res->result = false;
@@ -311,14 +311,14 @@ namespace lslidar_driver {
 
 
     /////////////////////////////// 机械式 ///////////////////////////////
-    bool LslidarCxServices::setIpAndPort(std::shared_ptr<lslidar_msgs::srv::IpAndPort::Request> req,
-                                         std::shared_ptr<lslidar_msgs::srv::IpAndPort::Response> res) {
+    bool LslidarCxServices::setIpAndPort(std::shared_ptr<uav_interfaces::srv::IpAndPort::Request> req,
+                                         std::shared_ptr<uav_interfaces::srv::IpAndPort::Response> res) {
 
         return LslidarServices::setIpAndPort(req, res);
     }
 
-    bool LslidarCxServices::setMotorControl(std::shared_ptr<lslidar_msgs::srv::MotorControl::Request> req,
-                                            std::shared_ptr<lslidar_msgs::srv::MotorControl::Response> res) {
+    bool LslidarCxServices::setMotorControl(std::shared_ptr<uav_interfaces::srv::MotorControl::Request> req,
+                                            std::shared_ptr<uav_interfaces::srv::MotorControl::Response> res) {
         unsigned char ucwp_data[1206];
         if (!setUcwpData(ucwp_data)) {
             res->result = false;
@@ -346,8 +346,8 @@ namespace lslidar_driver {
         return true;
     }
 
-    bool LslidarCxServices::setMotorSpeed(std::shared_ptr<lslidar_msgs::srv::MotorSpeed::Request> req,
-                                          std::shared_ptr<lslidar_msgs::srv::MotorSpeed::Response> res) {
+    bool LslidarCxServices::setMotorSpeed(std::shared_ptr<uav_interfaces::srv::MotorSpeed::Request> req,
+                                          std::shared_ptr<uav_interfaces::srv::MotorSpeed::Response> res) {
 
         return LslidarServices::setMotorSpeed(req, res);
     }
@@ -365,8 +365,8 @@ namespace lslidar_driver {
         return fpga_version;
     }
 
-    bool LslidarCxServices::setPowerControl(std::shared_ptr<lslidar_msgs::srv::PowerControl::Request> req,
-                                            std::shared_ptr<lslidar_msgs::srv::PowerControl::Response> res) {
+    bool LslidarCxServices::setPowerControl(std::shared_ptr<uav_interfaces::srv::PowerControl::Request> req,
+                                            std::shared_ptr<uav_interfaces::srv::PowerControl::Response> res) {
         unsigned char ucwp_data[1206];
         if (!setUcwpData(ucwp_data)) {
             res->result = false;
@@ -409,8 +409,8 @@ namespace lslidar_driver {
         return true;
     }
 
-    bool LslidarCxServices::setRfdRemoval(std::shared_ptr<lslidar_msgs::srv::RfdRemoval::Request> req,
-                                          std::shared_ptr<lslidar_msgs::srv::RfdRemoval::Response> res) {
+    bool LslidarCxServices::setRfdRemoval(std::shared_ptr<uav_interfaces::srv::RfdRemoval::Request> req,
+                                          std::shared_ptr<uav_interfaces::srv::RfdRemoval::Response> res) {
         unsigned char ucwp_data[1206];
         if (!setUcwpData(ucwp_data)) {
             res->result = false;
@@ -445,8 +445,8 @@ namespace lslidar_driver {
     }
 
 
-    bool LslidarCxServices::setTailRemoval(std::shared_ptr<lslidar_msgs::srv::TailRemoval::Request> req,
-                                           std::shared_ptr<lslidar_msgs::srv::TailRemoval::Response> res) {
+    bool LslidarCxServices::setTailRemoval(std::shared_ptr<uav_interfaces::srv::TailRemoval::Request> req,
+                                           std::shared_ptr<uav_interfaces::srv::TailRemoval::Response> res) {
         unsigned char ucwp_data[1206];
         if (!setUcwpData(ucwp_data)) {
             res->result = false;
@@ -485,8 +485,8 @@ namespace lslidar_driver {
         // LS_INFO << "****** " << __LINE__ << " ******" << LS_END;
     }
 
-    bool LslidarCxServices::setTimeMode(std::shared_ptr<lslidar_msgs::srv::TimeMode::Request> req,
-                                        std::shared_ptr<lslidar_msgs::srv::TimeMode::Response> res) {
+    bool LslidarCxServices::setTimeMode(std::shared_ptr<uav_interfaces::srv::TimeMode::Request> req,
+                                        std::shared_ptr<uav_interfaces::srv::TimeMode::Response> res) {
 
         return LslidarServices::setTimeMode(req, res);
     }
@@ -494,20 +494,20 @@ namespace lslidar_driver {
 
 
     //////////////////////////////// 905 ////////////////////////////////
-    bool LslidarChServices::setIpAndPort(std::shared_ptr<lslidar_msgs::srv::IpAndPort::Request> req,
-                                         std::shared_ptr<lslidar_msgs::srv::IpAndPort::Response> res) {
+    bool LslidarChServices::setIpAndPort(std::shared_ptr<uav_interfaces::srv::IpAndPort::Request> req,
+                                         std::shared_ptr<uav_interfaces::srv::IpAndPort::Response> res) {
 
         return LslidarServices::setIpAndPort(req, res);
     }
 
-    bool LslidarChServices::setMotorSpeed(std::shared_ptr<lslidar_msgs::srv::MotorSpeed::Request> req,
-                                          std::shared_ptr<lslidar_msgs::srv::MotorSpeed::Response> res) {
+    bool LslidarChServices::setMotorSpeed(std::shared_ptr<uav_interfaces::srv::MotorSpeed::Request> req,
+                                          std::shared_ptr<uav_interfaces::srv::MotorSpeed::Response> res) {
 
         return LslidarServices::setMotorSpeed(req, res);
     }
 
-    bool LslidarChServices::setTimeMode(std::shared_ptr<lslidar_msgs::srv::TimeMode::Request> req,
-                                        std::shared_ptr<lslidar_msgs::srv::TimeMode::Response> res) {
+    bool LslidarChServices::setTimeMode(std::shared_ptr<uav_interfaces::srv::TimeMode::Request> req,
+                                        std::shared_ptr<uav_interfaces::srv::TimeMode::Response> res) {
 
         return LslidarServices::setTimeMode(req, res);
     }
@@ -515,8 +515,8 @@ namespace lslidar_driver {
 
 
     /////////////////////////////// 1550 ///////////////////////////////
-    bool LslidarLsServices::setAngleDistortionCorrection(std::shared_ptr<lslidar_msgs::srv::AngleDistortionCorrection::Request> req,
-                                                         std::shared_ptr<lslidar_msgs::srv::AngleDistortionCorrection::Response> res) {
+    bool LslidarLsServices::setAngleDistortionCorrection(std::shared_ptr<uav_interfaces::srv::AngleDistortionCorrection::Request> req,
+                                                         std::shared_ptr<uav_interfaces::srv::AngleDistortionCorrection::Response> res) {
         unsigned char ucwp_data[1206];
         if (!setUcwpData(ucwp_data)) {
             res->result = false;
@@ -541,20 +541,20 @@ namespace lslidar_driver {
         return true;
     }
 
-    bool LslidarLsServices::setIpAndPort(std::shared_ptr<lslidar_msgs::srv::IpAndPort::Request> req,
-                                         std::shared_ptr<lslidar_msgs::srv::IpAndPort::Response> res) {
+    bool LslidarLsServices::setIpAndPort(std::shared_ptr<uav_interfaces::srv::IpAndPort::Request> req,
+                                         std::shared_ptr<uav_interfaces::srv::IpAndPort::Response> res) {
        
         return LslidarServices::setIpAndPort(req, res);
     }
 
-    bool LslidarLsServices::setTimeMode(std::shared_ptr<lslidar_msgs::srv::TimeMode::Request> req,
-                                        std::shared_ptr<lslidar_msgs::srv::TimeMode::Response> res) {
+    bool LslidarLsServices::setTimeMode(std::shared_ptr<uav_interfaces::srv::TimeMode::Request> req,
+                                        std::shared_ptr<uav_interfaces::srv::TimeMode::Response> res) {
         
         return LslidarServices::setTimeMode(req, res);
     }
 
-    bool LslidarLsServices::setFrameRate(std::shared_ptr<lslidar_msgs::srv::FrameRate::Request> req,
-                                         std::shared_ptr<lslidar_msgs::srv::FrameRate::Response> res) {
+    bool LslidarLsServices::setFrameRate(std::shared_ptr<uav_interfaces::srv::FrameRate::Request> req,
+                                         std::shared_ptr<uav_interfaces::srv::FrameRate::Response> res) {
         unsigned char ucwp_data[1206];
         if (!setUcwpData(ucwp_data)) {
             res->result = false;
@@ -578,8 +578,8 @@ namespace lslidar_driver {
         return true;
     }
 
-    bool LslidarLsServices::setInvalidData(std::shared_ptr<lslidar_msgs::srv::InvalidData::Request> req,
-                                           std::shared_ptr<lslidar_msgs::srv::InvalidData::Response> res) {
+    bool LslidarLsServices::setInvalidData(std::shared_ptr<uav_interfaces::srv::InvalidData::Request> req,
+                                           std::shared_ptr<uav_interfaces::srv::InvalidData::Response> res) {
         unsigned char ucwp_data[1206];
         if (!setUcwpData(ucwp_data)) {
             res->result = false;
@@ -603,8 +603,8 @@ namespace lslidar_driver {
         return true;
     }
 
-    bool LslidarLsServices::setStandbyMode(std::shared_ptr<lslidar_msgs::srv::StandbyMode::Request> req,
-                                           std::shared_ptr<lslidar_msgs::srv::StandbyMode::Response> res) {
+    bool LslidarLsServices::setStandbyMode(std::shared_ptr<uav_interfaces::srv::StandbyMode::Request> req,
+                                           std::shared_ptr<uav_interfaces::srv::StandbyMode::Response> res) {
         unsigned char ucwp_data[1206];
         if (!setUcwpData(ucwp_data)) {
             res->result = false;
