@@ -1,39 +1,16 @@
 """
-完整视觉跟踪系统 Launch 文件
-相机 + YOLOv5 检测 + DeepSORT 跟踪
+视觉跟踪系统 Launch 文件
+YOLOv5 检测 + DeepSORT 跟踪
 """
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument, GroupAction
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
-from launch.conditions import IfCondition
 
 
 def generate_launch_description():
     return LaunchDescription([
-        # 相机参数
-        DeclareLaunchArgument(
-            'camera_id',
-            default_value='0',
-            description='相机索引'
-        ),
-        DeclareLaunchArgument(
-            'image_width',
-            default_value='640',
-            description='图像宽度'
-        ),
-        DeclareLaunchArgument(
-            'image_height',
-            default_value='480',
-            description='图像高度'
-        ),
-        DeclareLaunchArgument(
-            'camera_fps',
-            default_value='15.0',
-            description='相机帧率'
-        ),
-        
         # YOLO 参数
         DeclareLaunchArgument(
             'yolo_model',
@@ -50,7 +27,7 @@ def generate_launch_description():
             default_value='0.45',
             description='YOLO IoU 阈值'
         ),
-        
+
         # DeepSORT 参数
         DeclareLaunchArgument(
             'deepsort_model',
@@ -58,11 +35,21 @@ def generate_launch_description():
             description='DeepSORT 特征模型'
         ),
         DeclareLaunchArgument(
+            'reid_model',
+            default_value='',
+            description='ReID 模型路径（ONNX 或 BPU，留空使用 deepsort_model）'
+        ),
+        DeclareLaunchArgument(
+            'deepsort_backend',
+            default_value='auto',
+            description='推理后端 (auto/onnx/bpu/simple)'
+        ),
+        DeclareLaunchArgument(
             'max_age',
             default_value='30',
             description='最大丢失帧数'
         ),
-        
+
         # 可视化参数
         DeclareLaunchArgument(
             'show_yolo_detection',
@@ -74,26 +61,7 @@ def generate_launch_description():
             default_value='true',
             description='显示 DeepSORT 跟踪结果'
         ),
-        
-        # 大华相机节点
-        Node(
-            package='camera',
-            executable='camera_test_node',
-            name='dahua_camera',
-            output='screen',
-            parameters=[{
-                'mode': 'dahua',
-                'camera_id': LaunchConfiguration('camera_id'),
-                'image_width': LaunchConfiguration('image_width'),
-                'image_height': LaunchConfiguration('image_height'),
-                'fps': LaunchConfiguration('camera_fps'),
-                'frame_id': 'camera',
-            }],
-            remappings=[
-                ('~/image_raw', '/camera/image_raw'),
-            ],
-        ),
-        
+
         # YOLOv5 检测节点
         Node(
             package='vision',
@@ -116,7 +84,7 @@ def generate_launch_description():
                 ('~/detection_image', '/yolo/detection_image'),
             ],
         ),
-        
+
         # DeepSORT 跟踪节点
         Node(
             package='vision',
@@ -125,6 +93,8 @@ def generate_launch_description():
             output='screen',
             parameters=[{
                 'model_name': LaunchConfiguration('deepsort_model'),
+                'reid_model': LaunchConfiguration('reid_model'),
+                'backend': LaunchConfiguration('deepsort_backend'),
                 'max_cosine_distance': 0.2,
                 'max_age': LaunchConfiguration('max_age'),
                 'n_init': 3,

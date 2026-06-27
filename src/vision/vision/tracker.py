@@ -171,19 +171,35 @@ class Tracker:
             detections: 检测列表
             
         Returns:
-            cost_matrix: 代价矩阵
+            cost_matrix: 代价矩阵 (len(tracks), len(detections))
         """
-        # 收集特征
-        track_features = np.array([t.feature for t in tracks if t.feature is not None])
-        detection_features = np.array([d.feature for d in detections if d.feature is not None])
-        
-        if len(track_features) == 0 or len(detection_features) == 0:
-            return np.zeros((len(tracks), len(detections)))
-        
+        cost_matrix = np.full((len(tracks), len(detections)), self.max_cosine_distance + 1e-6)
+
+        track_features_list = [t.feature for t in tracks]
+        detection_features_list = [d.feature for d in detections]
+
+        track_has_feature = [f is not None for f in track_features_list]
+        detection_has_feature = [f is not None for f in detection_features_list]
+
+        track_idx = [i for i, f in enumerate(track_features_list) if f is not None]
+        detection_idx = [i for i, f in enumerate(detection_features_list) if f is not None]
+
+        if not track_idx or not detection_idx:
+            return cost_matrix
+
+        track_features = np.array([track_features_list[i] for i in track_idx])
+        detection_features = np.array([detection_features_list[i] for i in detection_idx])
+
         # 计算余弦距离
-        cost_matrix = cosine_distance(detection_features, track_features)
-        
-        return cost_matrix.T  # 转置为 (tracks, detections)
+        sub_matrix = cosine_distance(detection_features, track_features)
+        sub_matrix = sub_matrix.T  # (len(track_idx), len(detection_idx))
+
+        # 将子矩阵填入完整矩阵的对应位置
+        for i, ti in enumerate(track_idx):
+            for j, dj in enumerate(detection_idx):
+                cost_matrix[ti, dj] = sub_matrix[i, j]
+
+        return cost_matrix
     
     def _initiate_track(self, detection: Detection) -> None:
         """

@@ -42,6 +42,16 @@ def generate_launch_description():
             description='检测置信度阈值'
         ),
         DeclareLaunchArgument(
+            'reid_model',
+            default_value='',
+            description='ReID 模型路径（ONNX 或 BPU，留空使用 model_name）'
+        ),
+        DeclareLaunchArgument(
+            'backend',
+            default_value='auto',
+            description='推理后端 (auto/onnx/bpu/simple)'
+        ),
+        DeclareLaunchArgument(
             'show_visualization',
             default_value='true',
             description='是否发布可视化图像'
@@ -55,6 +65,8 @@ def generate_launch_description():
             output='screen',
             parameters=[{
                 'model_name': LaunchConfiguration('model_name'),
+                'reid_model': LaunchConfiguration('reid_model'),
+                'backend': LaunchConfiguration('backend'),
                 'max_cosine_distance': LaunchConfiguration('max_cosine_distance'),
                 'max_iou_distance': LaunchConfiguration('max_iou_distance'),
                 'max_age': LaunchConfiguration('max_age'),
