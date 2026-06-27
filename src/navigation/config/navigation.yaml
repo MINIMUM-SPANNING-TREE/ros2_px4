@@ -5,26 +5,22 @@ pointcloud_topic: '/lslidar_point_cloud'
 
 # 障碍物检测参数
 obstacle_detection:
-  min_height: -1.0      # 最低高度（米，相对无人机）
-  max_height: 3.0       # 最高高度（米）
-  min_distance: 0.5     # 最近检测距离（米）
-  max_distance: 10.0    # 最远检测距离（米）
-  cluster_tolerance: 0.5  # 聚类容差（米）
-  min_cluster_size: 5   # 最小聚类点数
+  min_height: -1.0
+  max_height: 3.0
+  min_distance: 0.5
+  max_distance: 10.0
+  cluster_tolerance: 0.5
+  min_cluster_size: 5
 
 # 避障参数
 avoidance:
-  safety_distance: 2.0  # 安全距离（米）
-  warning_distance: 3.0 # 警告距离（米）
-  max_speed: 2.0        # 最大速度（m/s）
-  max_yaw_rate: 0.5     # 最大偏航角速度（rad/s）
+  safety_distance: 2.0
+  warning_distance: 3.0
+  max_speed: 2.0
+  max_yaw_rate: 0.5
 
 # 导航参数
 navigation:
-  planning_rate: 10.0   # 规划频率（Hz）
-  visualization_rate: 5.0  # 可视化频率（Hz）
-  auto_start: false     # 是否自动开始导航
-
-# 航点示例（格式: [x1, y1, z1, x2, y2, z2, ...]）
-# 取消注释以使用
-# waypoints: [0.0, 0.0, 2.0, 3.0, 0.0, 2.0, 3.0, 3.0, 2.0, 0.0, 3.0, 2.0]
+  planning_rate: 10.0
+  visualization_rate: 5.0
+  default_timeout: 60.0

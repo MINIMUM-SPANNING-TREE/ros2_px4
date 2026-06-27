@@ -1,0 +1,11 @@
+# 获取导航状态
+---
+string state
+int32 current_waypoint
+int32 total_waypoints
+float64 distance_to_goal
+float64 pos_x
+float64 pos_y
+float64 pos_z
+int32 obstacle_count
+bool success

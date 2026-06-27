@@ -1,0 +1,4 @@
+# 清空航点列表
+---
+bool success
+string message

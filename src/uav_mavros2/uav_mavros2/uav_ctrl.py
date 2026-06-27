@@ -169,6 +169,7 @@ class UavController(Node):
             rclpy.spin_once(self, timeout_sec=0.1)
 
         self.get_logger().info("✅ 起飞完成，达到目标高度")
+        self.update_pos()
         return True
 
     def move_offboard(self, x: float, y: float, z: float, yaw: float = None) -> bool:
@@ -265,7 +266,8 @@ class UavController(Node):
             if elapsed > timeout:
                 self.get_logger().error("❌ 降落超时")
                 return False
-
+    def update_pos(self):
+        self.target_pose = self.current_pose
 
 # ---------------- 节点入口 ----------------
 def main(args=None):

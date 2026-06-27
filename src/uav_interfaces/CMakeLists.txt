@@ -35,6 +35,12 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/StandbyMode.srv"
   "srv/TailRemoval.srv"
   "srv/TimeMode.srv"
+  "srv/NavSetGoal.srv"
+  "srv/NavAddWaypoint.srv"
+  "srv/NavStart.srv"
+  "srv/NavStop.srv"
+  "srv/NavGetStatus.srv"
+  "srv/NavClearWaypoints.srv"
   DEPENDENCIES std_msgs builtin_interfaces
 )
 

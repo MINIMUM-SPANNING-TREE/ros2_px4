@@ -9,13 +9,13 @@ from geometry_msgs.msg import PoseStamped, Twist
 from mavros_msgs.srv import CommandBool, SetMode as MavrosSetMode
 from uav_interfaces.srv import Takeoff, Land, Move, Arm, SetMode
 from uav_interfaces.msg import UavState, UavPose
-
+from uav_mavros2 import uavbase
 # 模块说明：
 # 该文件实现 `UavServer` ROS2 节点，提供无人机控制的服务接口（起飞/降落/移动/上锁-解锁/切换模式），
 # 并通过 MAVROS 与飞控交互，订阅遥测以维持内部状态，用于决策与发布 setpoint。
 # 注意：服务处理器中部分耗时操作会在后台线程执行以避免阻塞节点主循环。
 
-class UavServer(Node):
+class UavServer(uavbase.UavBase):
     def __init__(self):
         super().__init__('uav_controller_service_node')
 
@@ -239,6 +239,7 @@ class UavServer(Node):
         pose.pose.position.x = x
         pose.pose.position.y = y
         pose.pose.position.z = z
+        self.target_pose = pose  # 保存目标位姿用于调试或其他用途
         # 直接用 TelemetryNode 给的 yaw
         final_yaw = yaw if yaw is not None else (self.current_pose.yaw if self.current_pose else 0.0)
         # 简单 yaw -> 四元数转换（roll=pitch=0）
@@ -358,7 +359,8 @@ class UavServer(Node):
         response.success = True
         response.message = "设置模式已启动"
         return response
-
+    def update(self):
+        self.target_pose = self.current_pose
 
 def main(args=None):
     rclpy.init(args=args)

@@ -1,0 +1,6 @@
+# 开始航点导航
+bool auto_start
+---
+bool success
+string message
+int32 total_waypoints

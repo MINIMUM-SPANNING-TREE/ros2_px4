@@ -1,0 +1,5 @@
+# 停止/暂停导航
+bool pause
+---
+bool success
+string message

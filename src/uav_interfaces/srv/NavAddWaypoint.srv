@@ -1,0 +1,10 @@
+# 添加航点
+float64 x
+float64 y
+float64 z
+float64 yaw
+float64 hold_time
+---
+bool success
+string message
+int32 waypoint_index
