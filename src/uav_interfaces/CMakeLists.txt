@@ -18,6 +18,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/UavHealth.msg"
   "msg/LslidarInformation.msg"
   "msg/LslidarPacket.msg"
+  "msg/Detection.msg"
+  "msg/DetectionArray.msg"
   "srv/Takeoff.srv"
   "srv/Land.srv"
   "srv/Move.srv"

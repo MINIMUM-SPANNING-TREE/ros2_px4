@@ -9,7 +9,7 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 from sensor_msgs.msg import Image
-from vision_msg.msg import Detection, DetectionArray
+from uav_interfaces.msg import Detection, DetectionArray
 
 import numpy as np
 import time

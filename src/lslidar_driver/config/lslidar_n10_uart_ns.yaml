@@ -1,0 +1,29 @@
+lslidar_driver_node:
+  ros__parameters:
+    lidar_type: "X10"
+    lidar_model: "N10"
+    serial_port: "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5749006451-if00"
+    device_ip: ""
+    msop_port: 2368
+    difop_port: 2369
+    packet_rate: 188.0
+
+    frame_id: "laser"
+    pointcloud_topic: "lslidar_point_cloud"
+    laserscan_topic: "/scan"
+    use_time_service: false
+    use_first_point_time: false
+    publish_scan: true
+    use_high_precision: true
+    enable_noise_filter: false
+    min_range: 0.02
+    max_range: 50.0
+    angle_disable_min: [0]
+    angle_disable_max: [0]
+    is_pretreatment: false
+    x_offset: 0.0
+    y_offset: 0.0
+    z_offset: 0.0
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0

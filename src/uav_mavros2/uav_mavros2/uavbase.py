@@ -65,6 +65,8 @@ class UavBase(Node):
         self.current_home = msg
         self.home_received = True
     def timer_cb(self):
+        if self.current_state is None:
+            return
         if self.get_mode() == "OFFBOARD":
             self.target_pose.header.stamp = self.get_clock().now().to_msg()
             self.local_pos_pub.publish(self.target_pose)

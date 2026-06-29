@@ -79,9 +79,9 @@ VelocityCommand LocalPlanner::emergencyAvoid(
   double current_yaw)
 {
   VelocityCommand cmd;
-  cmd.vx = -0.3;
+  cmd.vx = -0.3;   // 后退
   cmd.vy = 0.0;
-  cmd.vz = 0.0;
+  cmd.vz = 0.0;    // 保持高度
 
   if (obstacle.angle > 0) {
     cmd.yaw_rate = -config_.max_yaw_rate;
@@ -115,7 +115,14 @@ VelocityCommand LocalPlanner::computeVelocity(
 
   cmd.vx = speed * std::cos(best_angle);
   cmd.vy = speed * std::sin(best_angle);
-  cmd.vz = std::clamp(dz * 0.5, -0.5, 0.5);
+
+  // 避障时保持当前高度，不改变z轴
+  if (nearest_obstacle && nearest_obstacle->distance < config_.warning_distance) {
+    cmd.vz = 0.0;  // 避障时保持高度
+  } else {
+    cmd.vz = std::clamp(dz * 0.5, -0.3, 0.3);  // 正常飞行时调整高度
+  }
+
   cmd.yaw_rate = std::clamp(best_angle * 0.5, -config_.max_yaw_rate, config_.max_yaw_rate);
 
   return cmd;

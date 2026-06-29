@@ -4,6 +4,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/twist_stamped.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 #include <uav_interfaces/srv/nav_set_goal.hpp>
 #include <uav_interfaces/srv/nav_add_waypoint.hpp>
@@ -82,6 +83,8 @@ private:
   void navigationLoop();
   bool flyToPosition(double x, double y, double z, double yaw);
   void stopNavigation();
+  void publishVelocity(double vx, double vy, double vz, double yaw_rate);
+  void stopVelocity();
 
   // ========== 可视化 ==========
   void publishObstacleMarkers();
@@ -108,6 +111,7 @@ private:
 
   // ========== 发布 ==========
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr velocity_pub_;
 
   // ========== 定时器 ==========
   rclcpp::TimerBase::SharedPtr planning_timer_;
@@ -139,6 +143,10 @@ private:
 
   std::thread nav_thread_;
   std::atomic<bool> stop_flag_{false};
+
+  // 避障恢复
+  int avoidance_counter_ = 0;
+  static constexpr int AVOIDANCE_TIMEOUT = 50;  // 5秒 (50 * 100ms)
 
   // 目标点（单点导航）
   double goal_x_ = 0.0;

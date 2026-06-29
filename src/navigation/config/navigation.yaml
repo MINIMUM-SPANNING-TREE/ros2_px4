@@ -5,7 +5,7 @@ pointcloud_topic: '/lslidar_point_cloud'
 
 # 障碍物检测参数
 obstacle_detection:
-  min_height: -1.0
+  min_height: 0.2
   max_height: 3.0
   min_distance: 0.5
   max_distance: 10.0

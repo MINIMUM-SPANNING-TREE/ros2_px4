@@ -68,6 +68,8 @@ NavigationNode::NavigationNode(const rclcpp::NodeOptions & options)
   // 发布
   marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
     "/navigation/markers", 10);
+  velocity_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>(
+    "/mavros/setpoint_velocity/cmd_vel", 10);
 
   // 定时器
   planning_timer_ = this->create_wall_timer(
@@ -202,6 +204,7 @@ void NavigationNode::handleStart(
 
   current_waypoint_index_ = 0;
   stop_flag_ = false;
+  avoidance_counter_ = 0;
   state_ = NavState::NAVIGATING;
 
   // 启动导航线程
@@ -363,6 +366,61 @@ void NavigationNode::stateCallback(
 
 void NavigationNode::planningTimerCallback()
 {
+  // 避障状态下持续发布速度指令
+  if (state_ == NavState::AVOIDING) {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (!current_pose_ || current_obstacles_.empty()) {
+      return;
+    }
+
+    if (current_waypoint_index_ >= waypoints_.size()) {
+      return;
+    }
+
+    const auto & wp = waypoints_[current_waypoint_index_];
+    double current_x = current_pose_->x;
+    double current_y = current_pose_->y;
+    double current_z = current_pose_->z;
+
+    // 高度保护：低于1.5m时强制上升
+    if (current_z < 1.5) {
+      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+        "高度过低 (%.1fm)，强制上升", current_z);
+      publishVelocity(0.0, 0.0, 0.5, 0.0);  // 强制上升
+      return;
+    }
+
+    // 执行避障规划
+    auto cmd = local_planner_->plan(
+      wp.x, wp.y, wp.z,
+      current_x, current_y, current_z,
+      current_pose_->yaw,
+      current_obstacles_);
+
+    // 发布避障速度指令
+    publishVelocity(cmd.vx, cmd.vy, cmd.vz, cmd.yaw_rate);
+
+    // 检查路径是否恢复畅通
+    if (local_planner_->isPathClear(
+        current_x, current_y, current_z,
+        wp.x, wp.y, wp.z,
+        current_obstacles_))
+    {
+      avoidance_counter_++;
+      if (avoidance_counter_ >= 10) {  // 连续1秒路径畅通
+        RCLCPP_INFO(this->get_logger(), "路径恢复畅通，继续导航");
+        state_ = NavState::NAVIGATING;
+        avoidance_counter_ = 0;
+        stopVelocity();
+      }
+    } else {
+      avoidance_counter_ = 0;
+    }
+
+    return;
+  }
+
   if (state_ != NavState::NAVIGATING) {
     return;
   }
@@ -392,16 +450,7 @@ void NavigationNode::planningTimerCallback()
       "检测到障碍物，启动避障");
 
     state_ = NavState::AVOIDING;
-
-    // 执行避障规划
-    auto cmd = local_planner_->plan(
-      wp.x, wp.y, wp.z,
-      current_x, current_y, current_z,
-      current_pose_->yaw,
-      current_obstacles_);
-
-    // TODO: 发布避障速度指令
-    // 这里可以通过 MAVROS 直接发布速度指令
+    avoidance_counter_ = 0;
   }
 }
 
@@ -423,8 +472,16 @@ void NavigationNode::navigationLoop()
       continue;
     }
 
-    // 避障检查
+    // 避障检查 - 等待避障完成或超时
     if (state_ == NavState::AVOIDING) {
+      avoidance_counter_++;
+      if (avoidance_counter_ >= AVOIDANCE_TIMEOUT) {
+        RCLCPP_WARN(this->get_logger(), "避障超时，跳过当前航点");
+        state_ = NavState::NAVIGATING;
+        avoidance_counter_ = 0;
+        stopVelocity();
+        current_waypoint_index_++;
+      }
       std::this_thread::sleep_for(100ms);
       continue;
     }
@@ -495,10 +552,28 @@ bool NavigationNode::flyToPosition(double x, double y, double z, double yaw)
   return false;
 }
 
+void NavigationNode::publishVelocity(double vx, double vy, double vz, double yaw_rate)
+{
+  auto msg = geometry_msgs::msg::TwistStamped();
+  msg.header.stamp = this->now();
+  msg.header.frame_id = "";  // MAVROS 期望空帧或 local_origin
+  msg.twist.linear.x = vx;
+  msg.twist.linear.y = vy;
+  msg.twist.linear.z = vz;
+  msg.twist.angular.z = yaw_rate;
+  velocity_pub_->publish(msg);
+}
+
+void NavigationNode::stopVelocity()
+{
+  publishVelocity(0.0, 0.0, 0.0, 0.0);
+}
+
 void NavigationNode::stopNavigation()
 {
   stop_flag_ = true;
   state_ = NavState::IDLE;
+  stopVelocity();
 
   if (nav_thread_.joinable()) {
     nav_thread_.join();
