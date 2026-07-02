@@ -43,6 +43,12 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/NavStop.srv"
   "srv/NavGetStatus.srv"
   "srv/NavClearWaypoints.srv"
+  "srv/MoveRelative.srv"
+  "srv/SetYaw.srv"
+  "srv/SetVelocity.srv"
+  "srv/SetMaxSpeed.srv"
+  "srv/EmergencyLand.srv"
+  "srv/EmergencyStop.srv"
   DEPENDENCIES std_msgs builtin_interfaces
 )
 

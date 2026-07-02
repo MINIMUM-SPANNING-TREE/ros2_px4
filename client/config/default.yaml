@@ -1,0 +1,19 @@
+backend:
+  url: ws://localhost:9200/ws/board
+
+sensors:
+  temperature:
+    enabled: true
+    interval: 5.0
+    base_value: 25.0
+    variance: 2.0
+  humidity:
+    enabled: true
+    interval: 5.0
+    base_value: 60.0
+    variance: 5.0
+  distance:
+    enabled: true
+    interval: 2.0
+    base_value: 2.0
+    variance: 0.5

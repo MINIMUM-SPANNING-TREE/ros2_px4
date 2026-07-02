@@ -9,8 +9,10 @@ import time
 import math
 import threading
 import uuid
-from geometry_msgs.msg import PoseStamped
-from uav_interfaces.srv import Takeoff, Land, Move, Arm, SetMode
+from geometry_msgs.msg import PoseStamped, TwistStamped
+from uav_interfaces.srv import Takeoff, Land, Move, Arm, SetMode, Rtl
+from uav_interfaces.srv import MoveRelative, SetYaw, SetVelocity, SetMaxSpeed
+from uav_interfaces.srv import EmergencyLand, EmergencyStop
 from uav_mavros2 import uavbase
 
 
@@ -29,8 +31,15 @@ class UavServer(uavbase.UavBase):
         self.create_service(Move, 'uav/move', self.handle_move)
         self.create_service(Arm, 'uav/arm', self.handle_arm)
         self.create_service(SetMode, 'uav/set_mode', self.handle_set_mode)
+        self.create_service(Rtl, 'uav/rtl', self.handle_rtl)
+        self.create_service(MoveRelative, 'uav/move_relative', self.handle_move_relative)
+        self.create_service(SetYaw, 'uav/set_yaw', self.handle_set_yaw)
+        self.create_service(SetVelocity, 'uav/set_velocity', self.handle_set_velocity)
+        self.create_service(SetMaxSpeed, 'uav/set_max_speed', self.handle_set_max_speed)
+        self.create_service(EmergencyLand, 'uav/emergency_land', self.handle_emergency_land)
+        self.create_service(EmergencyStop, 'uav/emergency_stop', self.handle_emergency_stop)
 
-        self.get_logger().info('UAV 控制服务已就绪：uav/takeoff uav/land uav/move uav/arm uav/set_mode')
+        self.get_logger().info('UAV 控制服务已就绪：takeoff land move arm set_mode rtl move_relative set_yaw set_velocity set_max_speed emergency_land emergency_stop')
 
     # ====================== 工具 ======================
 
@@ -170,6 +179,93 @@ class UavServer(uavbase.UavBase):
         resp.success = True
         resp.message = '模式切换已启动'
         return resp
+
+    def handle_rtl(self, req, resp):
+        self.get_logger().info(f'RTL 请求: timeout={req.timeout}')
+        self._spawn('rtl', self.do_rtl, req.timeout)
+        resp.success = True
+        resp.message = 'RTL 已启动'
+        return resp
+
+    def handle_move_relative(self, req, resp):
+        self.get_logger().info(f'相对移动请求: dx={req.dx}, dy={req.dy}, dz={req.dz}')
+        x, y, z = self._get_pos()
+        yaw = self._get_yaw() + req.dyaw if req.dyaw else self._get_yaw()
+        self._spawn('move_relative', self.do_move,
+                     x + req.dx, y + req.dy, z + req.dz, yaw)
+        resp.success = True
+        resp.message = '相对移动已启动'
+        return resp
+
+    def handle_set_yaw(self, req, resp):
+        self.get_logger().info(f'设置航向请求: yaw={req.yaw}')
+        x, y, z = self._get_pos()
+        self._spawn('set_yaw', self.do_move, x, y, z, req.yaw)
+        resp.success = True
+        resp.message = '航向设置已启动'
+        return resp
+
+    def handle_set_velocity(self, req, resp):
+        self.get_logger().info(f'速度控制请求: vx={req.vx}, vy={req.vy}, vz={req.vz}')
+        msg = TwistStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = ''
+        msg.twist.linear.x = req.vx
+        msg.twist.linear.y = req.vy
+        msg.twist.linear.z = req.vz
+        msg.twist.angular.z = req.yaw_rate
+        self.set_mode('OFFBOARD')
+        for _ in range(10):
+            self.local_vel_pub.publish(msg)
+            time.sleep(0.02)
+        resp.success = True
+        resp.message = '速度指令已发送'
+        return resp
+
+    def handle_set_max_speed(self, req, resp):
+        self.get_logger().info(f'设置最大速度: {req.max_speed} m/s')
+        self.max_speed = req.max_speed
+        resp.success = True
+        resp.message = f'最大速度已设为 {req.max_speed}'
+        return resp
+
+    def handle_emergency_land(self, req, resp):
+        self.get_logger().info('紧急降落请求')
+        self._spawn('emergency_land', self.do_land, 15.0)
+        resp.success = True
+        resp.message = '紧急降落已启动'
+        return resp
+
+    def handle_emergency_stop(self, req, resp):
+        self.get_logger().info('紧急停止请求')
+        msg = TwistStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = ''
+        msg.twist.linear.x = 0.0
+        msg.twist.linear.y = 0.0
+        msg.twist.linear.z = 0.0
+        msg.twist.angular.z = 0.0
+        for _ in range(20):
+            self.local_vel_pub.publish(msg)
+            time.sleep(0.02)
+        resp.success = True
+        resp.message = '紧急停止已执行'
+        return resp
+
+    def do_rtl(self, timeout=30.0) -> bool:
+        self.get_logger().info('执行 RTL...')
+        if not self.set_mode('AUTO.RTL'):
+            self.get_logger().warn('RTL 模式切换失败，尝试降落')
+            return self.do_land(timeout)
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            time.sleep(0.2)
+            if self.current_extended_state.landed_state == 1:
+                self.get_logger().info('RTL 完成')
+                return True
+        self.get_logger().error('RTL 超时')
+        return False
+
     def update(self):
         self.target_pose = self.current_pose
 

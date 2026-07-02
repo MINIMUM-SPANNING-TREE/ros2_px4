@@ -2,7 +2,7 @@ import rclpy
 import time
 from rclpy.node import Node
 from mavros_msgs.msg import State, ExtendedState, RCIn, HomePosition
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, TwistStamped
 from sensor_msgs.msg import Imu, BatteryState
 from mavros_msgs.srv import CommandBool, SetMode, CommandTOL
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
@@ -37,6 +37,7 @@ class UavBase(Node):
         self.create_subscription(HomePosition,  '/mavros/home_position/home',  self.home_cb,           qos)
 
         self.local_pos_pub = self.create_publisher(PoseStamped, '/mavros/setpoint_position/local', qos)
+        self.local_vel_pub = self.create_publisher(TwistStamped, '/mavros/setpoint_velocity/cmd_vel', qos)
 
         self.arming_client = self.create_client(CommandBool, '/mavros/cmd/arming')
         self.set_mode_client = self.create_client(SetMode, '/mavros/set_mode')
