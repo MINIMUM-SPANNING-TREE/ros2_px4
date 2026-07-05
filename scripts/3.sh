@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 unset PYTHONPATH
 unset CONDA_PREFIX CONDA_DEFAULT_ENV CONDA_PYTHON_EXE CONDA_EXE
 
-source ~/mavros2_ws/install/setup.bash
+source /opt/ros/humble/setup.bash
 source "${SCRIPT_DIR}/../install/setup.bash"
 
 # 传感器和算法

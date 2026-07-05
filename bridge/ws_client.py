@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # Copyright (C) 2026 最小生成树 (Minimum Spanning Tree). All rights reserved.
 #
 # Author: xianglajituibao
@@ -54,7 +54,7 @@ class WsClient:
         self.bridge_id = bridge_id or f'bridge-{uuid.uuid4().hex[:6]}'
         self.ws = None
         self._on_program_run = None   # async callback(run_id, program)
-        self._on_program_stop = None  # async callback(run_id)
+        self._on_program_stop = None  # async callback(run_id, emergency)
         self._connected = False
         self._tasks: list[asyncio.Task] = []  # prevent GC of fire-and-forget tasks
 
@@ -125,9 +125,10 @@ class WsClient:
 
         elif msg_type in ('program_stop', 'program_estop'):
             run_id = payload.get('runId')
-            logger.info('收到 program_stop: runId=%s', run_id)
+            emergency = msg_type == 'program_estop'
+            logger.info('收到 %s: runId=%s', msg_type, run_id)
             if self._on_program_stop:
-                task = asyncio.create_task(self._on_program_stop(run_id))
+                task = asyncio.create_task(self._on_program_stop(run_id, emergency))
                 self._tasks.append(task)
                 task.add_done_callback(self._tasks.remove)
 

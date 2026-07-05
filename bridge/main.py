@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # Copyright (C) 2026 最小生成树 (Minimum Spanning Tree). All rights reserved.
 #
 # Author: xianglajituibao
@@ -33,7 +33,7 @@ Bridge Node 入口点。
   ros2 run bridge_node bridge_node --ros-args -p backend_url:=ws://192.168.x.x:9200/ws/bridge
 
   # 直接运行
-  python3 -m rdk.bridge.main --url ws://192.168.x.x:9200/ws/bridge
+  python3 -m bridge_node.main --url ws://192.168.x.x:9200/ws/bridge
 """
 
 import argparse
@@ -45,9 +45,9 @@ import threading
 import rclpy
 from rclpy.node import Node
 
-from bridge.ros_client import RosClient
-from bridge.executor import ProgramExecutor
-from bridge.ws_client import WsClient
+from ros_client import RosClient
+from executor import ProgramExecutor
+from ws_client import WsClient
 
 logging.basicConfig(
     level=logging.INFO,
@@ -96,6 +96,13 @@ async def run_bridge(node: BridgeNode):
     # --- 收到 program_run ---
     async def on_program_run(run_id: str, program: dict):
         global _active_executor
+        logger.info('收到程序: runId=%s, keys=%s', run_id, list(program.keys()) if isinstance(program, dict) else type(program).__name__)
+        if isinstance(program, dict):
+            entry = program.get('entry')
+            blocks = program.get('blocks', {})
+            logger.info('entry=%s, blocks数量=%d', entry, len(blocks))
+            for bid, b in list(blocks.items())[:10]:
+                logger.info('  block[%s]: type=%s, next=%s, params=%s', bid, b.get('type'), b.get('next'), b.get('params'))
         async with _executor_lock:
             if _active_executor is not None:
                 logger.warning('已有执行在进行中，拒绝新任务 %s', run_id)
@@ -109,14 +116,20 @@ async def run_bridge(node: BridgeNode):
             async with _executor_lock:
                 _active_executor = None
 
-    # --- 收到 program_stop ---
-    async def on_program_stop(run_id: str):
+    # --- 收到 program_stop / program_estop ---
+    async def on_program_stop(run_id: str, emergency: bool = False):
         global _active_executor
         async with _executor_lock:
             executor = _active_executor
         if executor is not None:
-            logger.info('收到停止信号 runId=%s', run_id)
+            logger.info('收到%s信号 runId=%s', '急停' if emergency else '停止', run_id)
             executor.request_stop()
+        if emergency:
+            ok, msg = await ros_client.emergency_stop()
+            if ok:
+                logger.warning('急停服务已调用: %s', msg)
+            else:
+                logger.error('急停服务调用失败: %s', msg)
 
     ws_client.on_program_run(on_program_run)
     ws_client.on_program_stop(on_program_stop)

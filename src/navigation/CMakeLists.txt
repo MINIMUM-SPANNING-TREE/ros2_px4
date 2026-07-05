@@ -19,6 +19,7 @@ find_package(PCL REQUIRED COMPONENTS common filters segmentation)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 # Include directories
 include_directories(
@@ -49,6 +50,7 @@ add_library(local_planner SHARED
 ament_target_dependencies(local_planner
   rclcpp
   geometry_msgs
+  Eigen3
 )
 
 # Executable: navigation_node

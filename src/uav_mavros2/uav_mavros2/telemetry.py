@@ -9,10 +9,11 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 # MAVROS消息
-from mavros_msgs.msg import State, ExtendedState
+from mavros_msgs.msg import State, ExtendedState, Altitude
 from geometry_msgs.msg import PoseStamped, TwistStamped
+from sensor_msgs.msg import BatteryState, Imu
 
-# 自定义消息（你需要创建这些消息类型）
+# 自定义消息
 from uav_interfaces.msg import UavState, UavPose
 
 
@@ -36,15 +37,24 @@ class TelemetryNode(Node):
             PoseStamped, '/mavros/local_position/pose', self.on_pose, qos)
         self.sub_vel = self.create_subscription(
             TwistStamped, '/mavros/local_position/velocity', self.on_velocity, qos)
-        
+        self.sub_battery = self.create_subscription(
+            BatteryState, '/mavros/battery', self.on_battery, qos)
+        self.sub_altitude = self.create_subscription(
+            Altitude, '/mavros/altitude', self.on_altitude, qos)
+        self.sub_imu = self.create_subscription(
+            Imu, '/mavros/imu/data', self.on_imu, qos)
+
         # ========== 发布简化遥测数据 ==========
         self.pub_state = self.create_publisher(UavState, '/uav/telemetry/state', 10)
-        self.pub_pose = self.create_publisher(UavPose, '/uav/telemetry/pose', 10)    
-        
+        self.pub_pose = self.create_publisher(UavPose, '/uav/telemetry/pose', 10)
+
         # ========== 内部状态缓存 ==========
         self.raw_state = None
         self.raw_extended = None
         self.current_pose = None
+        self.current_battery = None
+        self.current_altitude = None
+        self.current_imu = None
         self.get_logger().info('Telemetry node initialized')
         self.timer = self.create_timer(0.1, self.publish_telemetry)
     
@@ -78,6 +88,36 @@ class TelemetryNode(Node):
     def on_velocity(self, msg: TwistStamped):
         """本地速度"""
         self.current_velocity = msg
+
+    def on_battery(self, msg: BatteryState):
+        """电池状态"""
+        self.current_battery = msg
+
+    def on_altitude(self, msg: Altitude):
+        """高度数据（气压计，室内可用）"""
+        self.current_altitude = msg
+        # 如果还没有收到local_position/pose，用气压计高度发布pose
+        if self.current_pose is None:
+            self._publish_pose_from_altitude()
+
+    def on_imu(self, msg: Imu):
+        """IMU数据（航向角，室内可用）"""
+        self.current_imu = msg
+
+    def _publish_pose_from_altitude(self):
+        """用气压计高度+IMU航向发布pose（无GPS时的fallback）"""
+        if self.current_altitude is None:
+            return
+        uav_pose = UavPose()
+        uav_pose.header.stamp = self.get_clock().now().to_msg()
+        uav_pose.header.frame_id = 'map'
+        uav_pose.x = 0.0
+        uav_pose.y = 0.0
+        uav_pose.z = self.current_altitude.relative
+        if self.current_imu is not None:
+            q = self.current_imu.orientation
+            uav_pose.yaw = self.quaternion_to_yaw(q.x, q.y, q.z, q.w)
+        self.pub_pose.publish(uav_pose)
     
     
     # ========== 定时发布融合状态 ==========
@@ -99,14 +139,18 @@ class TelemetryNode(Node):
             landed_map = {
                 0: 'UNKNOWN',
                 1: 'ON_GROUND',
-                2: 'IN_AIR', 
+                2: 'IN_AIR',
                 3: 'TAKING_OFF',
                 4: 'LANDING'
             }
             state_msg.landed_state = landed_map.get(
                 self.raw_extended.landed_state, 'UNKNOWN')
-        
+
         self.pub_state.publish(state_msg)
+
+        # 如果没有local_position/pose数据，用气压计高度fallback发布pose
+        if self.current_pose is None and self.current_altitude is not None:
+            self._publish_pose_from_altitude()
     
     @staticmethod
     def quaternion_to_yaw(x, y, z, w):

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # Copyright (C) 2026 最小生成树 (Minimum Spanning Tree). All rights reserved.
 #
 # Author: xianglajituibao
@@ -31,7 +31,7 @@
 import asyncio
 import logging
 
-from bridge.ros_client import RosClient
+from ros_client import RosClient
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,7 @@ class ProgramExecutor:
         self.ros = ros_client
         self.emit = event_callback
         self._stop_flag = False
+        self.command_gap_seconds = 0.5
 
     def request_stop(self):
         """由外部调用（收到 program_stop 时），置停止标志。"""
@@ -91,6 +92,19 @@ class ProgramExecutor:
                 return False
         return not self._stop_flag
 
+    async def _post_block_delay(self, block_type: str):
+        """Pause briefly between executable commands so PX4/ROS state can settle."""
+        if self._stop_flag:
+            return
+        if block_type in ('event_start', 'control_repeat') or block_type.startswith('sensor_'):
+            return
+        if self.command_gap_seconds <= 0:
+            return
+        await self._interruptible_sleep(
+            self.command_gap_seconds,
+            timeout=self.command_gap_seconds + 0.5,
+        )
+
     async def run(self, run_id: str, program: dict):
         """
         执行一段拼图程序。
@@ -100,6 +114,7 @@ class ProgramExecutor:
             program: BlockProgram dict（必须包含 entry, blocks）
         """
         self._stop_flag = False
+        self.command_gap_seconds = 0.5
         entry = program.get('entry')
         blocks = program.get('blocks', {})
 
@@ -190,6 +205,9 @@ class ProgramExecutor:
                     pct = self.ros.current_battery.get('percentage', '?')
                     logger.warning(f'检测到低电量 ({pct}%)，触发安全降落')
                     self._stop_flag = True
+
+            if not self._stop_flag:
+                await self._post_block_delay(block_type)
 
             # --- 决定下一步 ---
             if block_type == 'control_repeat':
@@ -284,58 +302,44 @@ class ProgramExecutor:
             x = float(params.get('x', 0.0))
             y = float(params.get('y', 0.0))
             z = float(params.get('z', 2.0))
-            ok, msg = await self.ros.move_to(x, y, z, stop_check=lambda: self._stop_flag)
+            ok, msg = await self.ros.move_to_offboard(
+                x, y, z, timeout=30.0, tolerance=0.5,
+                stop_check=lambda: self._stop_flag)
             if not ok:
                 raise RuntimeError(f'移动失败: {msg}')
-            # 等待到达目标位置
-            reached, wait_msg = await self.ros.wait_until_position(
-                target_x=x, target_y=y, target_z=z,
-                timeout=30.0, tolerance=0.5,
-                stop_check=lambda: self._stop_flag,
-            )
-            if not reached:
-                raise RuntimeError(f'移动等待失败: {wait_msg}')
 
         elif block_type == 'action_move_dir':
             direction = params.get('direction', 'forward')
             distance = float(params.get('distance', 1.0))
             # 记录移动前位姿，用于计算目标位置
             pre_pose = self.ros.current_pose
-            ok, msg = await self.ros.move_dir(direction, distance,
-                                            stop_check=lambda: self._stop_flag)
+            if pre_pose is None:
+                raise RuntimeError('无遥测数据，无法计算方向移动目标')
+            import math as _math
+            yaw = pre_pose.yaw
+            dx, dy = 0.0, 0.0
+            if direction == 'forward':
+                dx = distance * _math.cos(yaw)
+                dy = distance * _math.sin(yaw)
+            elif direction == 'backward':
+                dx = -distance * _math.cos(yaw)
+                dy = -distance * _math.sin(yaw)
+            elif direction == 'left':
+                dx = -distance * _math.sin(yaw)
+                dy = distance * _math.cos(yaw)
+            elif direction == 'right':
+                dx = distance * _math.sin(yaw)
+                dy = -distance * _math.cos(yaw)
+            else:
+                raise RuntimeError(f'未知方向: {direction}')
+            tx = pre_pose.x + dx
+            ty = pre_pose.y + dy
+            tz = pre_pose.z
+            ok, msg = await self.ros.move_to_offboard(
+                tx, ty, tz, yaw, timeout=15.0, tolerance=0.5,
+                stop_check=lambda: self._stop_flag)
             if not ok:
                 raise RuntimeError(f'方向移动失败: {msg}')
-            # 等待到达目标位置
-            if pre_pose is not None:
-                import math as _math
-                yaw = pre_pose.yaw
-                dx, dy = 0.0, 0.0
-                if direction == 'forward':
-                    dx = distance * _math.cos(yaw)
-                    dy = distance * _math.sin(yaw)
-                elif direction == 'backward':
-                    dx = -distance * _math.cos(yaw)
-                    dy = -distance * _math.sin(yaw)
-                elif direction == 'left':
-                    dx = -distance * _math.sin(yaw)
-                    dy = distance * _math.cos(yaw)
-                elif direction == 'right':
-                    dx = distance * _math.sin(yaw)
-                    dy = -distance * _math.cos(yaw)
-                tx = pre_pose.x + dx
-                ty = pre_pose.y + dy
-                tz = pre_pose.z
-                reached, wait_msg = await self.ros.wait_until_position(
-                    target_x=tx, target_y=ty, target_z=tz,
-                    timeout=15.0, tolerance=0.5,
-                    stop_check=lambda: self._stop_flag,
-                )
-                if not reached:
-                    raise RuntimeError(f'方向移动等待失败: {wait_msg}')
-            else:
-                # 无遥测数据，退回到固定延时
-                logger.warning('action_move_dir: 无遥测数据，使用固定延时')
-                await self._interruptible_sleep(1.0, timeout=15.0)
 
         elif block_type == 'action_arm':
             ok, msg = await self.ros.arm(True, stop_check=lambda: self._stop_flag)
@@ -352,17 +356,36 @@ class ProgramExecutor:
             ok, msg = await self.ros.set_mode(mode, stop_check=lambda: self._stop_flag)
             if not ok:
                 raise RuntimeError(f'模式切换失败: {msg}')
+            if hasattr(self.ros, 'wait_until_mode'):
+                reached, wait_msg = await self.ros.wait_until_mode(
+                    mode, timeout=3.0, stop_check=lambda: self._stop_flag
+                )
+                if not reached:
+                    raise RuntimeError(f'模式切换等待失败: {wait_msg}')
 
         elif block_type == 'action_move_relative':
             dx = float(params.get('dx', 0.0))
             dy = float(params.get('dy', 0.0))
             dz = float(params.get('dz', 0.0))
             dyaw = float(params.get('dyaw', 0.0))
-            ok, msg = await self.ros.move_relative(dx, dy, dz, dyaw,
-                                                   stop_check=lambda: self._stop_flag)
+            # 计算绝对目标位置
+            pre_pose = self.ros.current_pose
+            if pre_pose is None:
+                raise RuntimeError('无遥测数据，无法计算相对移动目标')
+            import math as _math
+            yaw_rad = pre_pose.yaw
+            # 机体坐标转 ENU（简化：假设 yaw 为主旋转）
+            abs_dx = dx * _math.cos(yaw_rad) - dy * _math.sin(yaw_rad)
+            abs_dy = dx * _math.sin(yaw_rad) + dy * _math.cos(yaw_rad)
+            tx = pre_pose.x + abs_dx
+            ty = pre_pose.y + abs_dy
+            tz = pre_pose.z + dz
+            new_yaw = pre_pose.yaw + _math.radians(dyaw)
+            ok, msg = await self.ros.move_to_offboard(
+                tx, ty, tz, new_yaw, timeout=15.0, tolerance=0.5,
+                stop_check=lambda: self._stop_flag)
             if not ok:
                 raise RuntimeError(f'相对移动失败: {msg}')
-            await self._interruptible_sleep(1.0, timeout=15.0)
 
         elif block_type == 'action_set_yaw':
             yaw = float(params.get('yaw', 0.0))
@@ -395,8 +418,13 @@ class ProgramExecutor:
 
         elif block_type == 'control_wait':
             seconds = float(params.get('seconds', 1.0))
-            logger.info(f'等待 {seconds} 秒')
-            await self._interruptible_sleep(seconds, timeout=seconds + 1.0)
+            if seconds <= 0:
+                raise RuntimeError(f'等待时间必须大于 0 秒: {seconds}')
+            logger.info(f'等待 {seconds} 秒开始')
+            completed = await self._interruptible_sleep(seconds, timeout=seconds + 1.0)
+            if not completed:
+                raise RuntimeError(f'等待 {seconds} 秒被中止或超时')
+            logger.info(f'等待 {seconds} 秒完成')
 
         elif block_type == 'control_repeat':
             # repeat 的"执行"不在这里——它的循环逻辑在 _execute_chain 的栈帧里处理。

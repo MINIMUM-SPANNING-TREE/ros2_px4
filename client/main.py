@@ -17,7 +17,7 @@ logger = logging.getLogger("rdk_x5")
 
 async def main():
     parser = argparse.ArgumentParser(description="RDK X5 Mock Edge Client")
-    parser.add_argument("--url", default="ws://localhost:9200/ws/board")
+    parser.add_argument("--url", default="ws://192.168.3.1:9200/ws/board")
     parser.add_argument("--config", default="config/default.yaml")
     args = parser.parse_args()
 

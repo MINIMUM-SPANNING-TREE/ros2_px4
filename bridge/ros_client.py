@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # Copyright (C) 2026 最小生成树 (Minimum Spanning Tree). All rights reserved.
 #
 # Author: xianglajituibao
@@ -37,6 +37,10 @@ from uav_interfaces.srv import Takeoff, Land, Move, Arm, SetMode, Rtl
 from uav_interfaces.srv import MoveRelative, SetYaw, SetVelocity, SetMaxSpeed
 from uav_interfaces.srv import EmergencyLand, EmergencyStop
 from uav_interfaces.msg import UavPose, UavState
+from sensor_msgs.msg import BatteryState
+from geometry_msgs.msg import PoseStamped
+from mavros_msgs.srv import CommandBool, SetMode as MavrosSetMode
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 
 class RosClient:
@@ -67,12 +71,23 @@ class RosClient:
         self.emergency_land_cli = node.create_client(EmergencyLand, 'uav/emergency_land')
         self.emergency_stop_cli = node.create_client(EmergencyStop, 'uav/emergency_stop')
 
+        # --- direct MAVROS clients (bypass ctrl_server async handles) ---
+        self.mavros_arm_cli = node.create_client(CommandBool, '/mavros/cmd/arming')
+        self.mavros_set_mode_cli = node.create_client(MavrosSetMode, '/mavros/set_mode')
+
+        # --- OFFBOARD setpoint publisher ---
+        self._setpoint_pub = node.create_publisher(
+            PoseStamped, '/mavros/setpoint_position/local', 10)
+        self._setpoint_timer = None  # 用于连续发送坐标点的定时器
+
         # --- telemetry subscriptions ---
         self.current_pose: UavPose | None = None
         self.current_state: UavState | None = None
         self.current_battery: dict = {}  # voltage, current, percentage
         node.create_subscription(UavPose, '/uav/telemetry/pose', self._pose_cb, 10)
         node.create_subscription(UavState, '/uav/telemetry/state', self._state_cb, 10)
+        qos = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST, depth=10)
+        node.create_subscription(BatteryState, '/mavros/battery', self._battery_cb, qos)
 
     # ---------- telemetry callbacks ----------
 
@@ -81,13 +96,13 @@ class RosClient:
 
     def _state_cb(self, msg: UavState):
         self.current_state = msg
-        # 提取电池数据
-        if hasattr(msg, 'battery_available') and msg.battery_available:
-            self.current_battery = {
-                'voltage': msg.battery_voltage,
-                'current': msg.battery_current,
-                'percentage': msg.battery_percentage,
-            }
+
+    def _battery_cb(self, msg: BatteryState):
+        self.current_battery = {
+            'voltage': msg.voltage,
+            'current': abs(msg.current),
+            'percentage': msg.percentage * 100.0,
+        }
 
     def update_battery(self, voltage: float = None, current: float = None,
                        percentage: float = None):
@@ -125,16 +140,21 @@ class RosClient:
     # ---------- service calls ----------
 
     async def takeoff(self, altitude: float, stop_check=None) -> tuple[bool, str]:
-        req = Takeoff.Request()
-        req.relative_alt = float(altitude)
-        return await self._call(self.takeoff_cli, req, 'takeoff', timeout=45.0,
-                                stop_check=stop_check)
+        """PX4 AUTO.TAKEOFF: set mode + arm. 直接调 MAVROS 拿真实结果。"""
+        ok, msg = await self.set_mode('AUTO.TAKEOFF', stop_check=stop_check)
+        if not ok:
+            return False, f'set_mode AUTO.TAKEOFF failed: {msg}'
+        ok, msg = await self.arm(True, stop_check=stop_check)
+        if not ok:
+            return False, f'arm failed: {msg}'
+        return True, f'takeoff({altitude}) OK'
 
     async def land(self, timeout: float = 30.0, stop_check=None) -> tuple[bool, str]:
-        req = Land.Request()
-        req.timeout = float(timeout)
-        return await self._call(self.land_cli, req, 'land', timeout=45.0,
-                                stop_check=stop_check)
+        """直接调 MAVROS set_mode AUTO.LAND，拿真实结果。"""
+        ok, msg = await self.set_mode('AUTO.LAND', stop_check=stop_check)
+        if not ok:
+            return False, f'set_mode AUTO.LAND failed: {msg}'
+        return True, 'land OK'
 
     async def move_to(self, x: float, y: float, z: float, yaw: float = 0.0,
                       stop_check=None) -> tuple[bool, str]:
@@ -173,16 +193,94 @@ class RosClient:
         return await self.move_to(target_x, target_y, pose.z, yaw, stop_check=stop_check)
 
     async def arm(self, value: bool = True, stop_check=None) -> tuple[bool, str]:
-        req = Arm.Request()
-        req.arm = value
-        return await self._call(self.arm_cli, req, 'arm' if value else 'disarm',
+        req = CommandBool.Request()
+        req.value = value
+        return await self._call(self.mavros_arm_cli, req, 'mavros/arm' if value else 'mavros/disarm',
                                 stop_check=stop_check)
 
     async def set_mode(self, mode: str, stop_check=None) -> tuple[bool, str]:
-        req = SetMode.Request()
-        req.mode = mode
-        return await self._call(self.set_mode_cli, req, f'set_mode({mode})',
+        req = MavrosSetMode.Request()
+        req.custom_mode = mode
+        return await self._call(self.mavros_set_mode_cli, req, f'mavros/set_mode({mode})',
                                 stop_check=stop_check)
+
+    # ---------- OFFBOARD 连续坐标点发送 ----------
+
+    def _start_setpoint_stream(self, x: float, y: float, z: float, yaw: float = 0.0):
+        """启动 10Hz 定时器，连续发送坐标点到 /mavros/setpoint_position/local。"""
+        self._setpoint_target = (x, y, z, yaw)
+        if self._setpoint_timer is not None:
+            self._setpoint_timer.cancel()
+        # 用 rclpy Timer 实现 10Hz 发布
+        self._setpoint_timer = self.node.create_timer(0.1, self._publish_setpoint)
+
+    def _publish_setpoint(self):
+        """定时器回调：发送当前目标坐标点。"""
+        if not hasattr(self, '_setpoint_target') or self._setpoint_target is None:
+            return
+        x, y, z, yaw = self._setpoint_target
+        msg = PoseStamped()
+        msg.header.stamp = self.node.get_clock().now().to_msg()
+        msg.header.frame_id = 'map'
+        msg.pose.position.x = x
+        msg.pose.position.y = y
+        msg.pose.position.z = z
+        # yaw → 四元数
+        msg.pose.orientation.z = math.sin(yaw / 2.0)
+        msg.pose.orientation.w = math.cos(yaw / 2.0)
+        self._setpoint_pub.publish(msg)
+
+    def _stop_setpoint_stream(self):
+        """停止连续坐标点发送。"""
+        if self._setpoint_timer is not None:
+            self._setpoint_timer.cancel()
+            self._setpoint_timer = None
+        self._setpoint_target = None
+
+    async def move_to_offboard(self, x: float, y: float, z: float, yaw: float = 0.0,
+                               timeout: float = 30.0, tolerance: float = 0.5,
+                               stop_check=None) -> tuple[bool, str]:
+        """
+        OFFBOARD 模式移动：切换到 OFFBOARD → 连续发送坐标点 → 等待到达目标。
+        这是真正的 OFFBOARD 移动，不依赖 ctrl_server。
+        """
+        # 1. 切换到 OFFBOARD
+        ok, msg = await self.set_mode('OFFBOARD', stop_check=stop_check)
+        if not ok:
+            return False, f'OFFBOARD 模式切换失败: {msg}'
+        # 给 PX4 时间接受 OFFBOARD 模式
+        await asyncio.sleep(0.5)
+
+        # 2. 启动连续坐标点发送（10Hz）
+        self._start_setpoint_stream(x, y, z, yaw)
+        self.logger.info(f'OFFBOARD 移动: 目标 ({x:.2f}, {y:.2f}, {z:.2f}), yaw={yaw:.2f}')
+
+        # 3. 等待到达目标位置
+        import time
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if stop_check is not None and stop_check():
+                self._stop_setpoint_stream()
+                return False, '移动被用户中止'
+            pose = self.current_pose
+            if pose is not None:
+                dist = math.sqrt(
+                    (pose.x - x) ** 2 + (pose.y - y) ** 2 + (pose.z - z) ** 2
+                )
+                if dist <= tolerance:
+                    self._stop_setpoint_stream()
+                    self.logger.info(f'OFFBOARD 移动到达: 距离 {dist:.2f}m')
+                    return True, f'到达目标位置, 距离 {dist:.2f}m'
+            await asyncio.sleep(0.2)
+
+        self._stop_setpoint_stream()
+        pose = self.current_pose
+        if pose is not None:
+            dist = math.sqrt(
+                (pose.x - x) ** 2 + (pose.y - y) ** 2 + (pose.z - z) ** 2
+            )
+            return False, f'OFFBOARD 移动超时({timeout}s): 距离 {dist:.2f}m'
+        return False, f'OFFBOARD 移动超时({timeout}s): 无遥测数据'
 
     async def rtl(self, timeout: float = 60.0, stop_check=None) -> tuple[bool, str]:
         req = Rtl.Request()
@@ -311,13 +409,42 @@ class RosClient:
                 self.logger.error(msg)
                 return False, msg
 
-        ok = getattr(result, 'success', False)
-        message = getattr(result, 'message', '')
+        if hasattr(result, 'success'):
+            ok = bool(getattr(result, 'success'))
+            message = getattr(result, 'message', '')
+        elif hasattr(result, 'mode_sent'):
+            ok = bool(getattr(result, 'mode_sent'))
+            message = f'mode_sent={ok}'
+        else:
+            ok = False
+            message = f'unsupported response type: {type(result).__name__}'
+
         self.logger.info(f'服务 {name} 返回: success={ok}, message={message}')
         return ok, message
 
     # ---------- state-based waiting ----------
 
+    async def wait_until_mode(
+        self,
+        mode: str,
+        timeout: float = 3.0,
+        stop_check=None,
+    ) -> tuple[bool, str]:
+        """Wait until telemetry reports the requested flight mode."""
+        import time
+        deadline = time.monotonic() + timeout
+        last_mode = None
+
+        while time.monotonic() < deadline:
+            if stop_check is not None and stop_check():
+                return False, '等待模式切换被用户中止'
+            state = self.current_state
+            last_mode = state.mode if state else None
+            if last_mode == mode:
+                return True, f'模式已切换到 {mode}'
+            await asyncio.sleep(0.1)
+
+        return False, f'等待模式 {mode} 超时({timeout}s), 当前模式: {last_mode}'
     async def wait_until_altitude(
         self,
         target_alt: float,
@@ -327,6 +454,9 @@ class RosClient:
     ) -> tuple[bool, str]:
         """
         等待无人机高度达到目标值（容差范围内）。
+        支持两种判断：
+          1. 绝对高度：pose.z >= target_alt - tolerance
+          2. 相对高度：从起飞点上升了 target_alt 以上（用于气压计有偏移的场景）
 
         Args:
             target_alt: 目标高度 (m)
@@ -341,16 +471,31 @@ class RosClient:
         deadline = time.monotonic() + timeout
         check_interval = 0.2  # 200ms polling
 
+        # 记录起始高度，用于相对判断
+        start_z = None
+        pose = self.current_pose
+        if pose is not None:
+            start_z = pose.z
+
         while time.monotonic() < deadline:
             if stop_check is not None and stop_check():
                 return False, '等待被用户中止'
             pose = self.current_pose
-            if pose is not None and pose.z >= target_alt - tolerance:
-                self.logger.info(
-                    f'wait_until_altitude: 到达高度 {pose.z:.2f}m '
-                    f'(目标 {target_alt:.2f}m ± {tolerance}m)'
-                )
-                return True, f'高度 {pose.z:.2f}m 达标'
+            if pose is not None:
+                # 判断1: 绝对高度达标
+                if pose.z >= target_alt - tolerance:
+                    self.logger.info(
+                        f'wait_until_altitude: 到达高度 {pose.z:.2f}m '
+                        f'(目标 {target_alt:.2f}m ± {tolerance}m)'
+                    )
+                    return True, f'高度 {pose.z:.2f}m 达标'
+                # 判断2: 从起始位置上升了 target_alt 以上（气压计偏移补偿）
+                if start_z is not None and (pose.z - start_z) >= (target_alt - tolerance):
+                    self.logger.info(
+                        f'wait_until_altitude: 相对上升 {pose.z - start_z:.2f}m '
+                        f'({start_z:.2f}m → {pose.z:.2f}m, 目标上升 {target_alt:.2f}m)'
+                    )
+                    return True, f'相对上升 {pose.z - start_z:.2f}m 达标'
             await asyncio.sleep(check_interval)
 
         pose = self.current_pose
