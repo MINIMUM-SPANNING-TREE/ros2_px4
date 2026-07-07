@@ -52,7 +52,7 @@ class Track:
         self.max_age = max_age
         
         # 状态
-        self.state = TrackState.TENTATIVE
+        self.state = TrackState.CONFIRMED if n_init <= 1 else TrackState.TENTATIVE
         self.hits = 1          # 连续匹配次数
         self.age = 1           # 总帧数
         self.time_since_update = 0  # 自上次更新以来的帧数
@@ -92,7 +92,8 @@ class Track:
         
         self.hits += 1
         self.time_since_update = 0
-        self.state = TrackState.CONFIRMED
+        if self.state == TrackState.TENTATIVE and self.hits >= self.n_init:
+            self.state = TrackState.CONFIRMED
         
         # 更新外观特征
         if feature is not None:

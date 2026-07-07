@@ -158,7 +158,8 @@ class Tracker:
         
         # 合并匹配结果
         matches = matches_a + matches_b
-        unmatched_tracks = list(set(unmatched_tracks_a) - set([k for k, _ in matches_b]))
+        matched_tracks_b = {k for k, _ in matches_b}
+        unmatched_tracks = list((set(unmatched_tracks_a) - matched_tracks_b) | set(unmatched_tracks_b))
         
         return matches, unmatched_tracks, unmatched_detections
     

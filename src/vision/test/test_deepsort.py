@@ -107,15 +107,15 @@ def test_basic_tracking():
     # 验证结果（DeepSORT 需要 n_init 帧来确认跟踪）
     # n_init=3, 所以第1帧只是初始化，不会出现在结果中
     assert len(results1) == 0, "帧1: 跟踪尚未确认"
-    assert len(results2) == 2, "帧2应该检测到2个目标"
+    assert len(results2) == 0, "帧2: n_init=3 时跟踪尚未确认"
     assert len(results3) == 2, "帧3应该检测到2个目标"
     assert len(results4) >= 1, "帧4至少应该有1个目标"
     assert len(results5) == 2, "帧5应该检测到2个目标"
     
     # 验证ID连续性
-    ids2 = {r['track_id'] for r in results2}
+    ids3 = {r['track_id'] for r in results3}
     ids5 = {r['track_id'] for r in results5}
-    assert len(ids2 & ids5) > 0, "应该有ID连续的目标"
+    assert len(ids3 & ids5) > 0, "应该有ID连续的目标"
     
     print("\n✓ 所有断言通过!")
     

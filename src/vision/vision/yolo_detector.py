@@ -440,9 +440,14 @@ class YOLODetector:
         # 获取类别 ID
         class_ids = np.argmax(class_scores, axis=1)
         
+        # OpenCV NMSBoxes expects [x, y, width, height], not [x1, y1, x2, y2].
+        nms_boxes = boxes_xyxy.copy()
+        nms_boxes[:, 2] = nms_boxes[:, 2] - nms_boxes[:, 0]
+        nms_boxes[:, 3] = nms_boxes[:, 3] - nms_boxes[:, 1]
+
         # 执行 NMS
         indices = cv2.dnn.NMSBoxes(
-            boxes_xyxy.tolist(),
+            nms_boxes.tolist(),
             final_scores.tolist(),
             self.conf_threshold,
             self.iou_threshold

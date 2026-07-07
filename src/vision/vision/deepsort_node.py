@@ -8,10 +8,8 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 from sensor_msgs.msg import Image
-from vision_msgs.msg import (
-    Detection2D, Detection2DArray, ObjectHypothesisWithPose,
-)
 from std_msgs.msg import Header
+from uav_interfaces.msg import DetectionArray, TrackDetection, TrackDetectionArray
 
 import numpy as np
 import json
@@ -102,7 +100,7 @@ class DeepSORTNode(Node):
         )
 
         self.detection_sub = self.create_subscription(
-            Detection2DArray, '/detections', self.detection_callback, qos_profile,
+            DetectionArray, '/detections', self.detection_callback, qos_profile,
         )
 
         self.image_sub = None
@@ -113,7 +111,7 @@ class DeepSORTNode(Node):
                 Image, '/image_raw', self.image_callback, qos_profile,
             )
 
-        self.track_pub = self.create_publisher(Detection2DArray, '/tracks', 10)
+        self.track_pub = self.create_publisher(TrackDetectionArray, '/tracks', 10)
 
         self.get_logger().info('DeepSORT Tracker Node initialized')
         self.get_logger().info(f'  Model: {model_name}, Backend: {backend}')
@@ -125,29 +123,20 @@ class DeepSORTNode(Node):
         except Exception as e:
             self.get_logger().warn(f'图像转换失败: {e}')
 
-    def detection_callback(self, msg: Detection2DArray):
+    def detection_callback(self, msg: DetectionArray):
         bboxes = []
         scores = []
         classes = []
 
         for det in msg.detections:
-            if len(det.results) == 0:
-                continue
-
-            hypothesis = det.results[0]
-            score = hypothesis.score
+            score = det.score
 
             if score < self.confidence_threshold:
                 continue
 
-            cx = det.bbox.center.position.x
-            cy = det.bbox.center.position.y
-            w = det.bbox.size_x
-            h = det.bbox.size_y
-
-            bboxes.append([cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2])
+            bboxes.append([det.x_min, det.y_min, det.x_max, det.y_max])
             scores.append(score)
-            classes.append(int(hypothesis.hypothesis.class_id) if hypothesis.hypothesis.class_id else 0)
+            classes.append(int(det.class_id) if det.class_id else 0)
 
         if len(bboxes) > 0:
             bboxes = np.array(bboxes, dtype=np.float32)
@@ -168,25 +157,25 @@ class DeepSORTNode(Node):
         self.publish_tracks(results, msg.header)
 
     def publish_tracks(self, results: List[Dict[str, Any]], header: Header):
-        track_msg = Detection2DArray()
+        track_msg = TrackDetectionArray()
         track_msg.header = header
-        track_msg.header.frame_id = 'tracks'
 
         for result in results:
-            det = Detection2D()
+            det = TrackDetection()
             x1, y1, x2, y2 = result['bbox']
 
-            det.bbox.center.position.x = (x1 + x2) / 2
-            det.bbox.center.position.y = (y1 + y2) / 2
-            det.bbox.size_x = x2 - x1
-            det.bbox.size_y = y2 - y1
+            det.track_id = int(result['track_id'])
+            det.class_id = str(result.get('class', 0))
+            det.score = result.get('score', 1.0)
+            det.x_min = float(x1)
+            det.y_min = float(y1)
+            det.x_max = float(x2)
+            det.y_max = float(y2)
+            det.age = int(result.get('age', 0))
+            det.hits = int(result.get('hits', 0))
+            det.time_since_update = int(result.get('time_since_update', 0))
 
-            hypothesis = ObjectHypothesisWithPose()
-            hypothesis.hypothesis.class_id = str(result.get('class', 0))
-            hypothesis.score = result.get('score', 1.0)
-            det.results = [hypothesis]
-
-            track_msg.detections.append(det)
+            track_msg.tracks.append(det)
 
         self.track_pub.publish(track_msg)
 

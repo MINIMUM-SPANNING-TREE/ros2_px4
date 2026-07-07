@@ -8,7 +8,7 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 from sensor_msgs.msg import Image
-from uav_interfaces.msg import Detection, DetectionArray
+from uav_interfaces.msg import DetectionArray, TrackDetection, TrackDetectionArray
 
 import numpy as np
 import json
@@ -97,9 +97,7 @@ class DeepSORTTrackerNode(Node):
             DetectionArray, '~/detections', self._detection_callback, sensor_qos,
         )
 
-        self.track_pub = self.create_publisher(
-            DetectionArray, '~/tracks', 10,
-        )
+        self.track_pub = self.create_publisher(TrackDetectionArray, '~/tracks', 10)
         self.track_image_pub = self.create_publisher(
             Image, '~/tracks_image', 5,
         )
@@ -232,21 +230,25 @@ class DeepSORTTrackerNode(Node):
                 del self.track_trajectories[tid]
 
     def _publish_tracks(self, results: List[Dict[str, Any]], header):
-        track_msg = DetectionArray()
+        track_msg = TrackDetectionArray()
         track_msg.header = header
 
         for result in results:
-            det = Detection()
+            det = TrackDetection()
             x1, y1, x2, y2 = result['bbox']
 
+            det.track_id = int(result['track_id'])
             det.class_id = str(result.get('class', 0))
             det.score = result.get('score', 1.0)
             det.x_min = float(x1)
             det.y_min = float(y1)
             det.x_max = float(x2)
             det.y_max = float(y2)
+            det.age = int(result.get('age', 0))
+            det.hits = int(result.get('hits', 0))
+            det.time_since_update = int(result.get('time_since_update', 0))
 
-            track_msg.detections.append(det)
+            track_msg.tracks.append(det)
 
         self.track_pub.publish(track_msg)
 

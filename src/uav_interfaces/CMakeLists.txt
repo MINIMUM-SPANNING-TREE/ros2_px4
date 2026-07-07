@@ -20,6 +20,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/LslidarPacket.msg"
   "msg/Detection.msg"
   "msg/DetectionArray.msg"
+  "msg/TrackDetection.msg"
+  "msg/TrackDetectionArray.msg"
   "srv/Takeoff.srv"
   "srv/Land.srv"
   "srv/Move.srv"
@@ -49,6 +51,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SetMaxSpeed.srv"
   "srv/EmergencyLand.srv"
   "srv/EmergencyStop.srv"
+  "srv/TrackTarget.srv"
   DEPENDENCIES std_msgs builtin_interfaces
 )
 

@@ -1,0 +1,18 @@
+# Target tracking control service.
+# command: start, stop, status
+string command
+string target_class
+float64 min_score
+float64 timeout_sec
+float64 tracking_duration_sec
+---
+bool success
+string message
+bool tracking
+bool target_found
+uav_interfaces/TrackDetection target
+int32 track_id
+float64 center_x
+float64 center_y
+float64 age_sec
+float64 tracking_elapsed_sec

@@ -1,4 +1,5 @@
 from setuptools import find_packages, setup
+from glob import glob
 
 package_name = 'fsm'
 
@@ -10,6 +11,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', glob('launch/*.launch.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -27,6 +29,10 @@ setup(
               'test1 = fsm.test1:main',
               'test2 = fsm.test2:main',
               'test3 = fsm.test3:main',
+              'track = fsm.track:main',
+              'track1 = fsm.track1:main',
+              'result = fsm.result:main',
+              'result1 = fsm.result1:main',
         ],
     },
 )
