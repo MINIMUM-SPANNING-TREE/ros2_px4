@@ -1,5 +1,13 @@
 from setuptools import find_packages, setup
 from glob import glob
+import sys
+
+for arg in ('--uninstall', '--editable'):
+    if arg in sys.argv:
+        sys.argv.remove(arg)
+if '--build-directory' in sys.argv:
+    index = sys.argv.index('--build-directory')
+    del sys.argv[index:index + 2]
 
 package_name = 'camera'
 

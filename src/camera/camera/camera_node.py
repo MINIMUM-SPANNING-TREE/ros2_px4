@@ -10,6 +10,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Header
 
+from array import array
 import numpy as np
 import time
 import threading
@@ -105,6 +106,8 @@ class CameraNode(Node):
         # 曝光参数
         self.declare_parameter('exposure', 10000.0)
         self.declare_parameter('gain', 0.0)
+        self.declare_parameter('software_gain', 1.0)
+        self.declare_parameter('software_offset', 0.0)
         
         # 触发参数
         self.declare_parameter('trigger_mode', False)
@@ -129,6 +132,8 @@ class CameraNode(Node):
         # 曝光参数
         self.exposure = self.get_parameter('exposure').value
         self.gain = self.get_parameter('gain').value
+        self.software_gain = self.get_parameter('software_gain').value
+        self.software_offset = self.get_parameter('software_offset').value
         
         # 触发参数
         self.trigger_mode = self.get_parameter('trigger_mode').value
@@ -161,6 +166,8 @@ class CameraNode(Node):
             exposure=self.exposure,
             gain=self.gain,
             trigger_mode=self.trigger_mode,
+            software_gain=self.software_gain,
+            software_offset=self.software_offset,
         )
     
     def _create_camera_info(self) -> CameraInfo:
@@ -272,8 +279,11 @@ class CameraNode(Node):
                 msg.height, msg.width, _ = frame.shape
         
         msg.is_bigendian = False
+        frame = np.ascontiguousarray(frame)
         msg.step = frame.strides[0]
-        msg.data = frame.tobytes()
+        data = array('B')
+        data.frombytes(frame.tobytes())
+        msg.data = data
         
         return msg
     

@@ -170,9 +170,10 @@ class Uav(UavBase):
 
         # move 使用位置 setpoint 控制，需先进入 OFFBOARD。
         if self.get_mode() != "OFFBOARD":
-            for _ in range(20):
+            for _ in range(200):
                 self.target_pose.header.stamp = self.get_clock().now().to_msg()
                 self.local_pos_pub.publish(self.target_pose)
+                self.set_mode('OFFBOARD')
                 time.sleep(0.05)
 
             if not self.set_mode("OFFBOARD"):

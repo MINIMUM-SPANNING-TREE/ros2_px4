@@ -1,4 +1,5 @@
 float64 yaw
+bool is_relative
 ---
 bool success
 string message

@@ -1,4 +1,5 @@
-float64 max_speed
+float64 max_horizontal
+float64 max_vertical
 ---
 bool success
 string message

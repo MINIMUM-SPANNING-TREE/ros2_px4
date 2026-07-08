@@ -90,9 +90,11 @@ class UavServer(uavbase.UavBase):
 
         # 预热: 直接发布 50 个 setpoint（OFFBOARD 切换前必须有 setpoint 流）
         warmup_pose = self._make_pose(x0, y0, z0, target_yaw)
-        for _ in range(50):
+        for _ in range(150):
             warmup_pose.header.stamp = self.get_clock().now().to_msg()
             self.local_pos_pub.publish(warmup_pose)
+            if self.get_mode() != 'OFFBOARD':
+                self.set_mode('OFFBOARD')
             time.sleep(0.02)
 
         if not self.set_mode('OFFBOARD'):
@@ -190,9 +192,12 @@ class UavServer(uavbase.UavBase):
     def handle_move_relative(self, req, resp):
         self.get_logger().info(f'相对移动请求: dx={req.dx}, dy={req.dy}, dz={req.dz}')
         x, y, z = self._get_pos()
-        yaw = self._get_yaw() + req.dyaw if req.dyaw else self._get_yaw()
+        current_yaw = self._get_yaw()
+        abs_dx = req.dx * math.cos(current_yaw) - req.dy * math.sin(current_yaw)
+        abs_dy = req.dx * math.sin(current_yaw) + req.dy * math.cos(current_yaw)
+        yaw = current_yaw + req.dyaw
         self._spawn('move_relative', self.do_move,
-                     x + req.dx, y + req.dy, z + req.dz, yaw)
+                     x + abs_dx, y + abs_dy, z + req.dz, yaw)
         resp.success = True
         resp.message = '相对移动已启动'
         return resp
@@ -200,7 +205,8 @@ class UavServer(uavbase.UavBase):
     def handle_set_yaw(self, req, resp):
         self.get_logger().info(f'设置航向请求: yaw={req.yaw}')
         x, y, z = self._get_pos()
-        self._spawn('set_yaw', self.do_move, x, y, z, req.yaw)
+        target_yaw = self._get_yaw() + req.yaw if req.is_relative else req.yaw
+        self._spawn('set_yaw', self.do_move, x, y, z, target_yaw)
         resp.success = True
         resp.message = '航向设置已启动'
         return resp
@@ -213,20 +219,25 @@ class UavServer(uavbase.UavBase):
         msg.twist.linear.x = req.vx
         msg.twist.linear.y = req.vy
         msg.twist.linear.z = req.vz
-        msg.twist.angular.z = req.yaw_rate
+        msg.twist.angular.z = 0.0
         self.set_mode('OFFBOARD')
-        for _ in range(10):
+        deadline = time.time() + max(0.0, float(req.duration))
+        while time.time() < deadline:
+            msg.header.stamp = self.get_clock().now().to_msg()
             self.local_vel_pub.publish(msg)
+            if self.get_mode() != 'OFFBOARD':
+                self.set_mode('OFFBOARD')
             time.sleep(0.02)
         resp.success = True
         resp.message = '速度指令已发送'
         return resp
 
     def handle_set_max_speed(self, req, resp):
-        self.get_logger().info(f'设置最大速度: {req.max_speed} m/s')
-        self.max_speed = req.max_speed
+        self.get_logger().info(f'设置最大速度: h={req.max_horizontal} m/s, v={req.max_vertical} m/s')
+        self.max_horizontal_speed = req.max_horizontal
+        self.max_vertical_speed = req.max_vertical
         resp.success = True
-        resp.message = f'最大速度已设为 {req.max_speed}'
+        resp.message = f'最大速度已设为 h={req.max_horizontal}, v={req.max_vertical}'
         return resp
 
     def handle_emergency_land(self, req, resp):

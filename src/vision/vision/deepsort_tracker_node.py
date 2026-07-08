@@ -5,11 +5,14 @@ DeepSORT 跟踪器节点 - 完整实现
 
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import ExternalShutdownException
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 from sensor_msgs.msg import Image
 from uav_interfaces.msg import DetectionArray, TrackDetection, TrackDetectionArray
 
+import contextlib
+import io
 import numpy as np
 import json
 import cv2
@@ -68,18 +71,19 @@ class DeepSORTTrackerNode(Node):
         self._declare_parameters()
         self._get_parameters()
 
-        self.deepsort = DeepSORT(
-            model_name=self.model_name,
-            reid_model_path=self.reid_model if self.reid_model else None,
-            feature_dim=self.feature_dim,
-            max_cosine_distance=self.max_cosine_distance,
-            nn_budget=self.nn_budget,
-            max_iou_distance=self.max_iou_distance,
-            max_age=self.max_age,
-            n_init=self.n_init,
-            device=self.device,
-            backend=self.backend,
-        )
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.deepsort = DeepSORT(
+                model_name=self.model_name,
+                reid_model_path=self.reid_model if self.reid_model else None,
+                feature_dim=self.feature_dim,
+                max_cosine_distance=self.max_cosine_distance,
+                nn_budget=self.nn_budget,
+                max_iou_distance=self.max_iou_distance,
+                max_age=self.max_age,
+                n_init=self.n_init,
+                device=self.device,
+                backend=self.backend,
+            )
 
         self.current_image: Optional[np.ndarray] = None
         self.image_header = None
@@ -106,10 +110,7 @@ class DeepSORTTrackerNode(Node):
         self.total_tracks = 0
         self.track_trajectories: Dict[int, List[Tuple[float, float]]] = {}
 
-        self.get_logger().info('=' * 50)
-        self.get_logger().info('DeepSORT Tracker Node Started')
-        self.get_logger().info('=' * 50)
-        self._log_parameters()
+        pass
 
     def _declare_parameters(self):
         self.declare_parameter('model_name', 'simple')
@@ -175,10 +176,7 @@ class DeepSORTTrackerNode(Node):
             self._publish_visualization(results, msg.header)
 
         if self.frame_count % 30 == 0:
-            self.get_logger().info(
-                f'Frame {self.frame_count}: {len(results)} tracks, '
-                f'total unique: {self.total_tracks}',
-            )
+            self.get_logger().info(f'跟踪到 {len(results)} 个目标')
 
     def _parse_detections(self, msg: DetectionArray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         bboxes = []
@@ -287,7 +285,7 @@ def main(args=None):
     try:
         node = DeepSORTTrackerNode()
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     except Exception as e:
         print(f'Error: {e}')

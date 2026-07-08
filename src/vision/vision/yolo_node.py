@@ -6,11 +6,14 @@ ROS2 YOLOv5 检测节点
 
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import ExternalShutdownException
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 from sensor_msgs.msg import Image
 from uav_interfaces.msg import Detection, DetectionArray
 
+import contextlib
+import io
 import numpy as np
 import time
 import os
@@ -96,10 +99,7 @@ class YOLONode(Node):
         self.last_fps_time = time.time()
         self.last_fps_frame = 0
 
-        self.get_logger().info('=' * 50)
-        self.get_logger().info('YOLOv5 Detection Node Started')
-        self.get_logger().info('=' * 50)
-        self._log_parameters()
+        pass
 
     def _declare_parameters(self):
         self.declare_parameter('model_path', '')
@@ -136,11 +136,7 @@ class YOLONode(Node):
 
     def _init_detector(self):
         if not self.model_path:
-            default_paths = [
-                os.path.expanduser('~/px4/ros2_px4/src/vision/models/yolov5s.onnx'),
-                os.path.expanduser('~/px4/ros2_px4/src/vision/models/yolov5s.bin'),
-                '/opt/models/yolov5s.onnx',
-            ]
+            default_paths = self._default_model_paths()
             for path in default_paths:
                 if os.path.exists(path):
                     self.model_path = path
@@ -150,13 +146,36 @@ class YOLONode(Node):
             self.get_logger().error(f'模型文件不存在: {self.model_path}')
             raise FileNotFoundError(f'模型文件不存在: {self.model_path}')
 
-        self.detector = YOLODetector(
-            model_path=self.model_path,
-            input_size=(self.input_size, self.input_size),
-            conf_threshold=self.conf_threshold,
-            iou_threshold=self.iou_threshold,
-            backend=self.backend,
-        )
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.detector = YOLODetector(
+                model_path=self.model_path,
+                input_size=(self.input_size, self.input_size),
+                conf_threshold=self.conf_threshold,
+                iou_threshold=self.iou_threshold,
+                backend=self.backend,
+            )
+
+    def _default_model_paths(self):
+        repo_model_dirs = [
+            os.path.expanduser('~/Desktop/px4/ros2_px4/src/vision/models'),
+            os.path.expanduser('~/px4/ros2_px4/src/vision/models'),
+            os.path.join(os.getcwd(), 'src/vision/models'),
+        ]
+        rdk_paths = [
+            *(os.path.join(model_dir, 'yolov5s_672x672_nv12.bin') for model_dir in repo_model_dirs),
+            *(os.path.join(model_dir, 'yolov5s.bin') for model_dir in repo_model_dirs),
+            '/opt/hobot/model/x5/basic/yolov5s_672x672_nv12.bin',
+        ]
+        onnx_paths = [
+            *(os.path.join(model_dir, 'yolov5s.onnx') for model_dir in repo_model_dirs),
+            '/opt/models/yolov5s.onnx',
+        ]
+
+        try:
+            import hobot_dnn  # noqa: F401
+            return rdk_paths + onnx_paths
+        except ImportError:
+            return onnx_paths + rdk_paths
 
     def _log_parameters(self):
         self.get_logger().info(f'  Model: {self.model_path}')
@@ -164,6 +183,8 @@ class YOLONode(Node):
         self.get_logger().info(f'  Confidence threshold: {self.conf_threshold}')
         self.get_logger().info(f'  IoU threshold: {self.iou_threshold}')
         self.get_logger().info(f'  Backend: {self.backend}')
+        if hasattr(self, 'detector'):
+            self.get_logger().info(f'  Active backend: {self.detector.backend}')
         self.get_logger().info(f'  Classes filter: {self.classes or "all"}')
 
     def _image_callback(self, msg: Image):
@@ -223,11 +244,7 @@ class YOLONode(Node):
         current_time = time.time()
         dt = current_time - self.last_fps_time
         if dt >= 2.0:
-            fps = (self.frame_count - self.last_fps_frame) / dt
-            self.get_logger().info(
-                f'FPS: {fps:.1f}, Inference: {inference_time * 1000:.1f}ms, '
-                f'Detections: {det_count}',
-            )
+            self.get_logger().info(f'检测到 {det_count} 个目标')
             self.last_fps_time = current_time
             self.last_fps_frame = self.frame_count
 
@@ -237,7 +254,7 @@ def main(args=None):
     try:
         node = YOLONode()
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     except Exception as e:
         print(f'Error: {e}')

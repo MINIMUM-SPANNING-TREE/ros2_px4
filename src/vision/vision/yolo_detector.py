@@ -5,8 +5,64 @@ YOLOv5 目标检测器
 
 import numpy as np
 import cv2
+import ctypes
+import json
+import os
 from typing import List, Tuple, Optional, Dict, Any
 import time
+
+
+class hbSysMem_t(ctypes.Structure):
+    _fields_ = [('phyAddr', ctypes.c_double), ('virAddr', ctypes.c_void_p), ('memSize', ctypes.c_int)]
+
+
+class hbDNNQuantiShift_yt(ctypes.Structure):
+    _fields_ = [('shiftLen', ctypes.c_int), ('shiftData', ctypes.c_char_p)]
+
+
+class hbDNNQuantiScale_t(ctypes.Structure):
+    _fields_ = [
+        ('scaleLen', ctypes.c_int),
+        ('scaleData', ctypes.POINTER(ctypes.c_float)),
+        ('zeroPointLen', ctypes.c_int),
+        ('zeroPointData', ctypes.c_char_p),
+    ]
+
+
+class hbDNNTensorShape_t(ctypes.Structure):
+    _fields_ = [('dimensionSize', ctypes.c_int * 8), ('numDimensions', ctypes.c_int)]
+
+
+class hbDNNTensorProperties_t(ctypes.Structure):
+    _fields_ = [
+        ('validShape', hbDNNTensorShape_t),
+        ('alignedShape', hbDNNTensorShape_t),
+        ('tensorLayout', ctypes.c_int),
+        ('tensorType', ctypes.c_int),
+        ('shift', hbDNNQuantiShift_yt),
+        ('scale', hbDNNQuantiScale_t),
+        ('quantiType', ctypes.c_int),
+        ('quantizeAxis', ctypes.c_int),
+        ('alignedByteSize', ctypes.c_int),
+        ('stride', ctypes.c_int * 8),
+    ]
+
+
+class hbDNNTensor_t(ctypes.Structure):
+    _fields_ = [('sysMem', hbSysMem_t * 4), ('properties', hbDNNTensorProperties_t)]
+
+
+class Yolov5PostProcessInfo_t(ctypes.Structure):
+    _fields_ = [
+        ('height', ctypes.c_int),
+        ('width', ctypes.c_int),
+        ('ori_height', ctypes.c_int),
+        ('ori_width', ctypes.c_int),
+        ('score_threshold', ctypes.c_float),
+        ('nms_threshold', ctypes.c_float),
+        ('nms_top_k', ctypes.c_int),
+        ('is_pad_resize', ctypes.c_int),
+    ]
 
 
 class YOLODetector:
@@ -66,6 +122,9 @@ class YOLODetector:
         self.session = None
         self.input_name = None
         self.output_names = None
+        self._hobot_model = None
+        self._hobot_postprocess = None
+        self._hobot_get_result = None
         
         # 类别名称
         self.class_names = self.COCO_CLASSES
@@ -147,7 +206,25 @@ class YOLODetector:
         2. hbDNN (底层 API) - 地平线 DNN API
         3. OpenCV DNN with RDK backend - OpenCV 4.x+ 支持
         """
-        # 方式1: 尝试 horizon_tc Runtime
+        # 方式1: RDK X5 常用 hobot_dnn Runtime
+        try:
+            from hobot_dnn import pyeasy_dnn as dnn
+            models = dnn.load(self.model_path)
+            self._hobot_model = models[0] if isinstance(models, list) else models
+            self._load_hobot_postprocess()
+            self.input_size = self._get_hobot_model_hw(self._hobot_model)
+            self.input_name = self._hobot_model.inputs[0].name
+            self.output_names = [output.name for output in self._hobot_model.outputs]
+            self.backend = 'hobot_dnn'
+            print(f"✅ RDK BPU 模型加载成功 (hobot_dnn): {self.model_path}")
+            print(f"   输入尺寸: {self.input_size}, 输出: {self.output_names}")
+            return
+        except ImportError:
+            pass
+        except Exception as e:
+            print(f"⚠️  hobot_dnn 加载失败: {e}")
+
+        # 方式2: 尝试 horizon_tc Runtime
         try:
             from horizon_tc import Runtime
             self._bpu_runtime = Runtime(self.model_path)
@@ -162,7 +239,7 @@ class YOLODetector:
         except Exception as e:
             print(f"⚠️  horizon_tc 加载失败: {e}")
 
-        # 方式2: 尝试 hbDNN
+        # 方式3: 尝试 hbDNN
         try:
             import hbDNN
             self._bpu_model = hbDNN.load(self.model_path)
@@ -175,7 +252,7 @@ class YOLODetector:
         except Exception as e:
             print(f"⚠️  hbDNN 加载失败: {e}")
 
-        # 方式3: 尝试 OpenCV DNN (支持 RDK 后端)
+        # 方式4: 尝试 OpenCV DNN (支持 RDK 后端)
         try:
             self.net = cv2.dnn.readNet(self.model_path)
             # 尝试设置 RDK BPU 后端
@@ -202,6 +279,23 @@ class YOLODetector:
             print("⚠️  未找到 ONNX 模型，使用 OpenCV DNN 后备方案")
             self.backend = "opencv"
             self._load_opencv()
+
+    def _load_hobot_postprocess(self):
+        lib_path = '/usr/lib/libpostprocess.so'
+        if not os.path.exists(lib_path):
+            raise FileNotFoundError(f'未找到 RDK YOLO 后处理库: {lib_path}')
+        lib = ctypes.CDLL(lib_path)
+        self._hobot_postprocess = lib.Yolov5doProcess
+        self._hobot_get_result = lib.Yolov5PostProcess
+        self._hobot_get_result.argtypes = [ctypes.POINTER(Yolov5PostProcessInfo_t)]
+        self._hobot_get_result.restype = ctypes.c_char_p
+
+    @staticmethod
+    def _get_hobot_model_hw(model):
+        props = model.inputs[0].properties
+        if props.layout == 'NCHW':
+            return int(props.shape[2]), int(props.shape[3])
+        return int(props.shape[1]), int(props.shape[2])
     
     def _load_opencv(self):
         """使用 OpenCV DNN 加载模型"""
@@ -241,6 +335,12 @@ class YOLODetector:
                 - class_id: 类别 ID
                 - class_name: 类别名称
         """
+        if self.backend == 'hobot_dnn':
+            detections = self._detect_hobot_dnn(image)
+            if classes is not None:
+                detections = [d for d in detections if d['class_id'] in classes]
+            return detections
+
         # 预处理
         input_tensor, ratio, pad = self._preprocess(image)
         
@@ -261,6 +361,90 @@ class YOLODetector:
         if classes is not None:
             detections = [d for d in detections if d['class_id'] in classes]
         
+        return detections
+
+    def _detect_hobot_dnn(self, image: np.ndarray) -> List[Dict[str, Any]]:
+        input_tensor = self._preprocess_hobot_nv12(image)
+        self._hobot_model.forward(input_tensor)
+        return self._postprocess_hobot(image.shape[:2])
+
+    def _preprocess_hobot_nv12(self, image: np.ndarray) -> np.ndarray:
+        target_h, target_w = self.input_size
+        resized = cv2.resize(image, (target_w, target_h), interpolation=cv2.INTER_AREA)
+        return self._bgr_to_nv12(resized)
+
+    @staticmethod
+    def _bgr_to_nv12(image: np.ndarray) -> np.ndarray:
+        height, width = image.shape[:2]
+        area = height * width
+        yuv420p = cv2.cvtColor(image, cv2.COLOR_BGR2YUV_I420).reshape((area * 3 // 2,))
+        y = yuv420p[:area]
+        uv_planar = yuv420p[area:].reshape((2, area // 4))
+        uv_packed = uv_planar.transpose((1, 0)).reshape((area // 2,))
+        nv12 = np.empty_like(yuv420p)
+        nv12[:area] = y
+        nv12[area:] = uv_packed
+        return nv12
+
+    def _postprocess_hobot(self, image_shape: Tuple[int, int]) -> List[Dict[str, Any]]:
+        image_h, image_w = image_shape
+        model_h, model_w = self.input_size
+
+        pp_info = Yolov5PostProcessInfo_t()
+        pp_info.height = model_h
+        pp_info.width = model_w
+        pp_info.ori_height = int(image_h)
+        pp_info.ori_width = int(image_w)
+        pp_info.score_threshold = ctypes.c_float(self.conf_threshold)
+        pp_info.nms_threshold = ctypes.c_float(self.iou_threshold)
+        pp_info.nms_top_k = 100
+        pp_info.is_pad_resize = 0
+
+        output_tensors = (hbDNNTensor_t * len(self._hobot_model.outputs))()
+        for index, output in enumerate(self._hobot_model.outputs):
+            props = output.properties
+            tensor = output_tensors[index]
+            tensor.properties.tensorLayout = 2 if props.layout == 'NCHW' else 0
+
+            if len(props.scale_data) == 0:
+                tensor.properties.quantiType = 0
+                tensor.sysMem[0].virAddr = ctypes.cast(
+                    output.buffer.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                    ctypes.c_void_p,
+                )
+            else:
+                tensor.properties.quantiType = 2
+                tensor.properties.scale.scaleData = props.scale_data.ctypes.data_as(
+                    ctypes.POINTER(ctypes.c_float)
+                )
+                tensor.sysMem[0].virAddr = ctypes.cast(
+                    output.buffer.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)),
+                    ctypes.c_void_p,
+                )
+
+            for dim_index, dim in enumerate(props.shape):
+                tensor.properties.validShape.dimensionSize[dim_index] = int(dim)
+            tensor.properties.validShape.numDimensions = len(props.shape)
+            self._hobot_postprocess(output_tensors[index], ctypes.pointer(pp_info), index)
+
+        result = self._hobot_get_result(ctypes.pointer(pp_info))
+        if not result:
+            return []
+        result_text = result.decode('utf-8')
+        json_start = result_text.find('[')
+        if json_start < 0:
+            return []
+
+        detections = []
+        for item in json.loads(result_text[json_start:]):
+            class_id = int(item.get('id', 0))
+            bbox = item.get('bbox', [0.0, 0.0, 0.0, 0.0])
+            detections.append({
+                'bbox': [float(v) for v in bbox[:4]],
+                'score': float(item.get('score', 0.0)),
+                'class_id': class_id,
+                'class_name': self.class_names[class_id] if class_id < len(self.class_names) else f'class_{class_id}',
+            })
         return detections
     
     def _preprocess(self, image: np.ndarray) -> Tuple[np.ndarray, float, Tuple[int, int]]:

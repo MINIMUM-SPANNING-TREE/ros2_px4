@@ -37,7 +37,7 @@ class VisionResultLogger(Node):
             depth=20,
         )
         self.create_subscription(DetectionArray, self.yolo_topic, self._yolo_cb, qos)
-        # self.create_subscription(TrackDetectionArray, self.deepsort_topic, self._deepsort_cb, qos)
+        self.create_subscription(TrackDetectionArray, self.deepsort_topic, self._deepsort_cb, qos)
 
         self.get_logger().info(f'Saving YOLO results from {self.yolo_topic}')
         self.get_logger().info(f'Saving DeepSORT results from {self.deepsort_topic}')

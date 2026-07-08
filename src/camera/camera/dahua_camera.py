@@ -3,6 +3,10 @@
 支持大华MVSDK和GenICam标准接口
 """
 
+import importlib.util
+import sys
+from ctypes import byref, c_double, c_int, c_longlong, c_uint, c_ulonglong, pointer, string_at
+from pathlib import Path
 import numpy as np
 import time
 from typing import Optional, Tuple, Callable
@@ -28,7 +32,9 @@ class DahuaCamera(CameraBase):
                  exposure: float = 10000.0,
                  gain: float = 0.0,
                  trigger_mode: bool = False,
-                 pixel_format: str = "BGR8"):
+                 pixel_format: str = "BGR8",
+                 software_gain: float = 1.0,
+                 software_offset: float = 0.0):
         """
         初始化大华相机
         
@@ -48,10 +54,17 @@ class DahuaCamera(CameraBase):
         self.gain = gain
         self.trigger_mode = trigger_mode
         self.pixel_format = pixel_format
+        self.software_gain = software_gain
+        self.software_offset = software_offset
         
         # 相机句柄
         self.camera_handle = None
+        self.stream_source = None
         self.sdk_type = None
+        self.sdk = None
+        self.capture_thread = None
+        self._last_publish_time = 0.0
+        self._next_publish_time = 0.0
         
     def connect(self) -> bool:
         """
@@ -60,7 +73,13 @@ class DahuaCamera(CameraBase):
         Returns:
             success: 是否连接成功
         """
-        # 尝试大华MVSDK
+        # 尝试华睿/大华 USB3 Vision GenICam SDK
+        if self._try_connect_huaray_sdk():
+            self.sdk_type = "huaray"
+            self.state = CameraState.CONNECTED
+            return True
+
+        # 尝试其他大华MVSDK
         if self._try_connect_mvsdk():
             self.sdk_type = "mvsdk"
             self.state = CameraState.CONNECTED
@@ -74,6 +93,139 @@ class DahuaCamera(CameraBase):
         
         self.state = CameraState.ERROR
         return False
+
+    def _load_huaray_sdk(self):
+        """Load the Huaray MVSDK Python wrapper shipped with the camera demo."""
+        try:
+            import MVSDK as sdk
+            if hasattr(sdk, "GENICAM_getSystemInstance"):
+                return sdk
+        except Exception:
+            pass
+
+        candidates = []
+        for parent in Path(__file__).resolve().parents:
+            candidates.append(parent / "src" / "camera" / "demo" / "MVSDK.py")
+            candidates.append(parent / "demo" / "MVSDK.py")
+        candidates.extend([
+            Path("/home/sunrise/Desktop/px4/ros2_px4/src/camera/demo/MVSDK.py"),
+            Path("/home/sunrise/Desktop/mdt_vision/camera/demo/MVSDK.py"),
+        ])
+
+        for path in candidates:
+            if not path.exists():
+                continue
+            spec = importlib.util.spec_from_file_location("huaray_mvsdk", path)
+            if spec is None or spec.loader is None:
+                continue
+            module = importlib.util.module_from_spec(spec)
+            sys.modules.setdefault("huaray_mvsdk", module)
+            spec.loader.exec_module(module)
+            if hasattr(module, "GENICAM_getSystemInstance"):
+                return module
+        return None
+
+    def _try_connect_huaray_sdk(self) -> bool:
+        """Connect Dahua USB3 Vision cameras through the Huaray GenICam SDK."""
+        sdk = self._load_huaray_sdk()
+        if sdk is None:
+            return False
+
+        try:
+            system = pointer(sdk.GENICAM_System())
+            ret = sdk.GENICAM_getSystemInstance(byref(system))
+            if ret != 0:
+                return False
+
+            camera_list = pointer(sdk.GENICAM_Camera())
+            camera_count = c_uint()
+            ret = system.contents.discovery(
+                system,
+                byref(camera_list),
+                byref(camera_count),
+                c_int(sdk.GENICAM_EProtocolType.typeAll),
+            )
+            if ret != 0 or camera_count.value == 0:
+                return False
+
+            index = int(self.camera_id) if str(self.camera_id).isdigit() else 0
+            if index >= camera_count.value:
+                return False
+
+            camera = camera_list[index]
+            ret = camera.connect(
+                camera,
+                c_int(sdk.GENICAM_ECameraAccessPermission.accessPermissionControl),
+            )
+            if ret != 0:
+                return False
+
+            self.sdk = sdk
+            self.camera_handle = camera
+            self._set_huaray_params()
+            return True
+        except Exception as e:
+            print(f"Huaray MVSDK连接失败: {e}")
+            self.camera_handle = None
+            self.sdk = None
+            return False
+
+    def _set_huaray_params(self):
+        if self.sdk is None or self.camera_handle is None:
+            return
+
+        self._set_huaray_enum("TriggerMode", "On" if self.trigger_mode else "Off")
+        self._set_huaray_int("Width", self.width)
+        self._set_huaray_int("Height", self.height)
+        # Some USB3 Vision models clamp unexpectedly when this node is enabled.
+        # Keep acquisition free-running and throttle publication in software.
+        self._set_huaray_bool("AcquisitionFrameRateEnable", False)
+        self._set_huaray_double("ExposureTime", self.exposure)
+        self._set_huaray_double("Gain", self.gain)
+
+    def _set_huaray_int(self, name: str, value: int) -> bool:
+        node = pointer(self.sdk.GENICAM_IntNode())
+        info = self.sdk.GENICAM_IntNodeInfo()
+        info.pCamera = pointer(self.camera_handle)
+        info.attrName = name.encode()
+        if self.sdk.GENICAM_createIntNode(byref(info), byref(node)) != 0:
+            return False
+        ret = node.contents.setValue(node, c_longlong(int(value)))
+        node.contents.release(node)
+        return ret == 0
+
+    def _set_huaray_double(self, name: str, value: float) -> bool:
+        node = pointer(self.sdk.GENICAM_DoubleNode())
+        info = self.sdk.GENICAM_DoubleNodeInfo()
+        info.pCamera = pointer(self.camera_handle)
+        info.attrName = name.encode()
+        if self.sdk.GENICAM_createDoubleNode(byref(info), byref(node)) != 0:
+            return False
+        ret = node.contents.setValue(node, c_double(float(value)))
+        node.contents.release(node)
+        return ret == 0
+
+    def _set_huaray_enum(self, name: str, value: str) -> bool:
+        node = pointer(self.sdk.GENICAM_EnumNode())
+        info = self.sdk.GENICAM_EnumNodeInfo()
+        info.pCamera = pointer(self.camera_handle)
+        info.attrName = name.encode()
+        if self.sdk.GENICAM_createEnumNode(byref(info), byref(node)) != 0:
+            return False
+        ret = node.contents.setValueBySymbol(node, value.encode())
+        node.contents.release(node)
+        return ret == 0
+
+    def _set_huaray_bool(self, name: str, value: bool) -> bool:
+        node = pointer(self.sdk.GENICAM_BoolNode())
+        info = self.sdk.GENICAM_BoolNodeInfo()
+        info.pCamera = pointer(self.camera_handle)
+        info.attrName = name.encode()
+        if self.sdk.GENICAM_createBoolNode(byref(info), byref(node)) != 0:
+            return False
+        ret = node.contents.setValue(node, c_uint(1 if value else 0))
+        node.contents.release(node)
+        return ret == 0
     
     def _try_connect_mvsdk(self) -> bool:
         """尝试使用大华MVSDK连接"""
@@ -200,7 +352,12 @@ class DahuaCamera(CameraBase):
             self.stop_streaming()
         
         if self.camera_handle is not None:
-            if self.sdk_type == "mvsdk":
+            if self.sdk_type == "huaray":
+                try:
+                    self.camera_handle.disConnect(byref(self.camera_handle))
+                except Exception:
+                    pass
+            elif self.sdk_type == "mvsdk":
                 self.camera_handle.MV_CC_CloseDevice()
                 self.camera_handle.MV_CC_DestroyHandle()
             elif self.sdk_type == "opencv":
@@ -225,7 +382,9 @@ class DahuaCamera(CameraBase):
         
         self.frame_callback = callback
         
-        if self.sdk_type == "mvsdk":
+        if self.sdk_type == "huaray":
+            return self._start_huaray_streaming()
+        elif self.sdk_type == "mvsdk":
             return self._start_mvsdk_streaming()
         elif self.sdk_type == "opencv":
             self.is_streaming = True
@@ -233,6 +392,125 @@ class DahuaCamera(CameraBase):
             return True
         
         return False
+
+    def _start_huaray_streaming(self) -> bool:
+        try:
+            stream_info = self.sdk.GENICAM_StreamSourceInfo()
+            stream_info.pCamera = pointer(self.camera_handle)
+            stream_info.channeId = 0
+
+            stream = pointer(self.sdk.GENICAM_StreamSource())
+            ret = self.sdk.GENICAM_createStreamSource(pointer(stream_info), byref(stream))
+            if ret != 0:
+                return False
+
+            stream.contents.setBufferCount(stream, c_uint(8))
+            ret = stream.contents.startGrabbing(
+                stream,
+                c_ulonglong(0),
+                c_int(self.sdk.GENICAM_EGrabStrategy.grabStrartegySequential),
+            )
+            if ret != 0:
+                stream.contents.release(stream)
+                return False
+
+            self.stream_source = stream
+            self.is_streaming = True
+            self.state = CameraState.STREAMING
+            self._next_publish_time = time.time()
+            self.capture_thread = threading.Thread(target=self._huaray_capture_loop, daemon=True)
+            self.capture_thread.start()
+            return True
+        except Exception as e:
+            print(f"开始Huaray采集失败: {e}")
+            return False
+
+    def _huaray_capture_loop(self):
+        target_period = 1.0 / self.fps if self.fps > 0 else 0.0
+        while self.is_streaming and self.stream_source is not None:
+            frame = pointer(self.sdk.GENICAM_Frame())
+            ret = self.stream_source.contents.getFrame(self.stream_source, byref(frame), c_uint(1000))
+            if ret != 0:
+                continue
+
+            try:
+                if frame.contents.valid(frame) != 0:
+                    continue
+
+                now = time.time()
+                if target_period > 0 and now < self._next_publish_time:
+                    continue
+
+                image = self._convert_huaray_frame(frame)
+                if image is None:
+                    continue
+
+                self._last_publish_time = now
+                if target_period > 0:
+                    self._next_publish_time += target_period
+                    if self._next_publish_time < now - target_period:
+                        self._next_publish_time = now + target_period
+                with self.frame_lock:
+                    self.current_frame = image
+                    self.frame_count += 1
+                    self.last_frame_time = now
+
+                if self.frame_callback:
+                    self.frame_callback(image)
+            finally:
+                frame.contents.release(frame)
+
+    def _convert_huaray_frame(self, frame) -> Optional[np.ndarray]:
+        try:
+            width = frame.contents.getImageWidth(frame)
+            height = frame.contents.getImageHeight(frame)
+            size = frame.contents.getImageSize(frame)
+            pixel_format = frame.contents.getImagePixelFormat(frame)
+            image_ptr = frame.contents.getImage(frame)
+            data = string_at(image_ptr, size)
+
+            sdk = self.sdk
+            if pixel_format == sdk.EPixelType.gvspPixelMono8:
+                image = np.frombuffer(data, dtype=np.uint8).reshape((height, width)).copy()
+                return self._apply_software_adjustment(image)
+
+            if pixel_format in (
+                sdk.EPixelType.gvspPixelBayRG8,
+                sdk.EPixelType.gvspPixelBayGR8,
+                sdk.EPixelType.gvspPixelBayGB8,
+                sdk.EPixelType.gvspPixelBayBG8,
+            ):
+                import cv2
+                bayer = np.frombuffer(data, dtype=np.uint8).reshape((height, width))
+                code_map = {
+                    sdk.EPixelType.gvspPixelBayRG8: cv2.COLOR_BAYER_RG2BGR,
+                    sdk.EPixelType.gvspPixelBayGR8: cv2.COLOR_BAYER_GR2BGR,
+                    sdk.EPixelType.gvspPixelBayGB8: cv2.COLOR_BAYER_GB2BGR,
+                    sdk.EPixelType.gvspPixelBayBG8: cv2.COLOR_BAYER_BG2BGR,
+                }
+                image = cv2.cvtColor(bayer, code_map[pixel_format])
+                return self._apply_software_adjustment(image)
+
+            if pixel_format == sdk.EPixelType.gvspPixelBGR8:
+                image = np.frombuffer(data, dtype=np.uint8).reshape((height, width, 3)).copy()
+                return self._apply_software_adjustment(image)
+            if pixel_format == sdk.EPixelType.gvspPixelRGB8:
+                import cv2
+                rgb = np.frombuffer(data, dtype=np.uint8).reshape((height, width, 3))
+                image = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                return self._apply_software_adjustment(image)
+
+            print(f"Unsupported Huaray pixel format: {pixel_format}")
+            return None
+        except Exception as e:
+            print(f"Huaray帧转换失败: {e}")
+            return None
+
+    def _apply_software_adjustment(self, image: np.ndarray) -> np.ndarray:
+        if self.software_gain == 1.0 and self.software_offset == 0.0:
+            return image
+        adjusted = image.astype(np.float32) * self.software_gain + self.software_offset
+        return np.clip(adjusted, 0, 255).astype(np.uint8)
     
     def _start_mvsdk_streaming(self) -> bool:
         """开始MVSDK采集"""
@@ -310,9 +588,19 @@ class DahuaCamera(CameraBase):
     def stop_streaming(self):
         """停止采集"""
         self.is_streaming = False
+
+        if self.capture_thread is not None and self.capture_thread.is_alive():
+            self.capture_thread.join(timeout=2.0)
+        self.capture_thread = None
         
         if self.camera_handle is not None:
-            if self.sdk_type == "mvsdk":
+            if self.sdk_type == "huaray" and self.stream_source is not None:
+                try:
+                    self.stream_source.contents.stopGrabbing(self.stream_source)
+                    self.stream_source.contents.release(self.stream_source)
+                finally:
+                    self.stream_source = None
+            elif self.sdk_type == "mvsdk":
                 self.camera_handle.MV_CC_StopGrabbing()
         
         self.state = CameraState.CONNECTED
@@ -337,7 +625,7 @@ class DahuaCamera(CameraBase):
                 return frame
             return None
         
-        # MVSDK使用回调模式，直接返回缓存的帧
+        # SDK使用采集线程/回调模式，直接返回缓存的帧
         with self.frame_lock:
             return self.current_frame.copy() if self.current_frame is not None else None
     
@@ -356,6 +644,8 @@ class DahuaCamera(CameraBase):
         if self.camera_handle is None:
             return False
         
+        if self.sdk_type == "huaray":
+            return self._set_huaray_double("ExposureTime", exposure_us)
         if self.sdk_type == "mvsdk":
             return self.camera_handle.MV_CC_SetFloatValue("ExposureTime", exposure_us) == 0
         elif self.sdk_type == "opencv":
@@ -379,6 +669,8 @@ class DahuaCamera(CameraBase):
         if self.camera_handle is None:
             return False
         
+        if self.sdk_type == "huaray":
+            return self._set_huaray_double("Gain", gain_db)
         if self.sdk_type == "mvsdk":
             return self.camera_handle.MV_CC_SetFloatValue("Gain", gain_db) == 0
         elif self.sdk_type == "opencv":

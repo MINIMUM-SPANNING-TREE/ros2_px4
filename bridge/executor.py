@@ -302,42 +302,17 @@ class ProgramExecutor:
             x = float(params.get('x', 0.0))
             y = float(params.get('y', 0.0))
             z = float(params.get('z', 2.0))
-            ok, msg = await self.ros.move_to_offboard(
-                x, y, z, timeout=30.0, tolerance=0.5,
-                stop_check=lambda: self._stop_flag)
+            yaw = float(params.get('yaw', 0.0))
+            ok, msg = await self.ros.move_to(
+                x, y, z, yaw, stop_check=lambda: self._stop_flag)
             if not ok:
                 raise RuntimeError(f'移动失败: {msg}')
 
         elif block_type == 'action_move_dir':
             direction = params.get('direction', 'forward')
             distance = float(params.get('distance', 1.0))
-            # 记录移动前位姿，用于计算目标位置
-            pre_pose = self.ros.current_pose
-            if pre_pose is None:
-                raise RuntimeError('无遥测数据，无法计算方向移动目标')
-            import math as _math
-            yaw = pre_pose.yaw
-            dx, dy = 0.0, 0.0
-            if direction == 'forward':
-                dx = distance * _math.cos(yaw)
-                dy = distance * _math.sin(yaw)
-            elif direction == 'backward':
-                dx = -distance * _math.cos(yaw)
-                dy = -distance * _math.sin(yaw)
-            elif direction == 'left':
-                dx = -distance * _math.sin(yaw)
-                dy = distance * _math.cos(yaw)
-            elif direction == 'right':
-                dx = distance * _math.sin(yaw)
-                dy = -distance * _math.cos(yaw)
-            else:
-                raise RuntimeError(f'未知方向: {direction}')
-            tx = pre_pose.x + dx
-            ty = pre_pose.y + dy
-            tz = pre_pose.z
-            ok, msg = await self.ros.move_to_offboard(
-                tx, ty, tz, yaw, timeout=15.0, tolerance=0.5,
-                stop_check=lambda: self._stop_flag)
+            ok, msg = await self.ros.move_dir(
+                direction, distance, stop_check=lambda: self._stop_flag)
             if not ok:
                 raise RuntimeError(f'方向移动失败: {msg}')
 
@@ -368,22 +343,8 @@ class ProgramExecutor:
             dy = float(params.get('dy', 0.0))
             dz = float(params.get('dz', 0.0))
             dyaw = float(params.get('dyaw', 0.0))
-            # 计算绝对目标位置
-            pre_pose = self.ros.current_pose
-            if pre_pose is None:
-                raise RuntimeError('无遥测数据，无法计算相对移动目标')
-            import math as _math
-            yaw_rad = pre_pose.yaw
-            # 机体坐标转 ENU（简化：假设 yaw 为主旋转）
-            abs_dx = dx * _math.cos(yaw_rad) - dy * _math.sin(yaw_rad)
-            abs_dy = dx * _math.sin(yaw_rad) + dy * _math.cos(yaw_rad)
-            tx = pre_pose.x + abs_dx
-            ty = pre_pose.y + abs_dy
-            tz = pre_pose.z + dz
-            new_yaw = pre_pose.yaw + _math.radians(dyaw)
-            ok, msg = await self.ros.move_to_offboard(
-                tx, ty, tz, new_yaw, timeout=15.0, tolerance=0.5,
-                stop_check=lambda: self._stop_flag)
+            ok, msg = await self.ros.move_relative(
+                dx, dy, dz, dyaw, stop_check=lambda: self._stop_flag)
             if not ok:
                 raise RuntimeError(f'相对移动失败: {msg}')
 
